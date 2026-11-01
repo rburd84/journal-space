@@ -1,17 +1,23 @@
-import {Star} from "lucide-react"
+import {Star} from "lucide-react";
+import {Link} from "react-router";
 
 export default function EntryCard({
-    title,
-    date,
-    status,
-    isFavorite,
+                                      title,
+                                      date,
+                                      status,
+                                      isFavorite,
                                   }) {
     return (
         <article className="rounded-xl border border-paper-border bg-paper p-5 md:p-6">
             <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                     <h3 className="font-serif text-xl text-ink">
-                        {title}
+                        <Link
+                            to="/entries/sample"
+                            className="rounded-sm hover:text-sage-dark focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sage"
+                        >
+                            {title}
+                        </Link>
                     </h3>
 
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -39,7 +45,7 @@ export default function EntryCard({
                 </span>
             </div>
         </article>
-    )
+    );
 }
 
 

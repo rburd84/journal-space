@@ -1,5 +1,6 @@
 import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
+import { Link } from "react-router"
 
 export default function Reader() {
     return (
@@ -50,7 +51,11 @@ export default function Reader() {
                     Favorited
                 </Button>
 
-                <Button className="h-auto min-h-11 px-5 py-3">
+                <Button
+                  nativeButton={false}
+                  render={<Link to="/entries/new" />}
+                  className="h-auto min-h-11 px-5 py-3"
+                >
                     Edit Entry
                 </Button>
             </footer>

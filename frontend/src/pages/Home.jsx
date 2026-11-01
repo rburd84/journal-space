@@ -1,6 +1,7 @@
 import {PenLine} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import JournalCard from "@/components/JournalCard";
+import { Link } from "react-router"
 
 const sampleJournals = [{
     id: "journal-1", title: "Daily Reflections", description: "Personal journal",
@@ -40,7 +41,11 @@ export default function Home() {
                     Start with a few words. There's no right way to begin.
                 </p>
 
-                <Button className="mt-8 h-auto min-h-11 px-5 py-3">
+                <Button
+                    nativeButton={false}
+                    render={<Link to="/entries/new"/>}
+                    className="h-auto px-5 py-3"
+                >
                     Start Writing
                 </Button>
             </section>

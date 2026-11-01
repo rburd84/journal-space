@@ -1,4 +1,5 @@
 import {Plus} from "lucide-react"
+import {Link} from "react-router";
 
 import EntryCard from "@/components/EntryCard"
 import {Button} from "@/components/ui/button"
@@ -52,7 +53,10 @@ export default function Entries() {
                     </p>
                 </div>
 
-                <Button className="h-auto min-h-11 px-5 py-3">
+                <Button
+                    nativeButton={false}
+                    render={<Link to="/entries/new" />}
+                    className="h-auto min-h-11 px-5 py-3">
                     <Plus size={18} aria-hidden="true"/>
                     New Entry
                 </Button>
