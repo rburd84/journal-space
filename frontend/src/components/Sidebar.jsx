@@ -22,7 +22,7 @@ export default function Sidebar() {
                             key={item.label}
                             className={`flex items-center gap-3 rounded-lg px-4 py-3 ${
                                 isActive
-                                    ? "bg-sidebar-selected.font-medium.text-ink"
+                                    ? "bg-sidebar-selected font-medium text-ink"
                                     : "text-muted-foreground"
                             }`}>
                             <Icon size={19} aria-hidden="true"/>
