@@ -2,6 +2,7 @@ import {Star} from "lucide-react";
 import {Link} from "react-router";
 
 export default function EntryCard({
+                                      id,
                                       title,
                                       date,
                                       status,
@@ -13,7 +14,7 @@ export default function EntryCard({
                 <div className="min-w-0">
                     <h3 className="font-serif text-xl text-ink">
                         <Link
-                            to="/entries/sample"
+                            to={`/entries/${id}`}
                             className="rounded-sm hover:text-sage-dark focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sage"
                         >
                             {title}
@@ -37,11 +38,11 @@ export default function EntryCard({
             <div className="mt-4">
                 <span
                     className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                        status === "Published"
+                        status?.toLowerCase() === "published"
                             ? "bg-sidebar-selected text-sage-dark"
                             : "bg-secondary text-muted-foreground"
                     }`}>
-                    {status}
+                    {status === "published" ? "Published" : status === "draft" ? "Draft" : status}
                 </span>
             </div>
         </article>

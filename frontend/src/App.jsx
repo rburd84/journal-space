@@ -1,4 +1,4 @@
-import {BrowserRouter, Route, Routes} from "react-router"
+import {BrowserRouter, Route, Routes} from "react-router";
 import AppShell from "@/components/AppShell";
 import Home from "@/pages/Home";
 import Journals from "@/pages/Journals.jsx";
@@ -15,11 +15,11 @@ function App() {
                     <Route path="/journals" element={<Journals/>}/>
                     <Route path="/entries" element={<Entries/>}/>
                     <Route path="/entries/new" element={<Editor/>}/>
-                    <Route path="/entries/sample" element={<Reader/>}/>
+                    <Route path="/entries/:entryId" element={<Reader/>}/>
                 </Routes>
             </AppShell>
         </BrowserRouter>
-    )
+    );
 }
 
-export default App
+export default App;

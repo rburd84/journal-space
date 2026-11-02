@@ -1,41 +1,44 @@
-import {Plus} from "lucide-react"
+import {Plus} from "lucide-react";
 import {Link} from "react-router";
+import {useEffect, useState} from "react";
 
-import EntryCard from "@/components/EntryCard"
-import {Button} from "@/components/ui/button"
+import EntryCard from "@/components/EntryCard";
+import {Button} from "@/components/ui/button";
 
-const sampleEntries = [
-    {
-        id: "entry-1",
-        title: "Finding calm in the everyday",
-        date: "October 30, 2026",
-        status: "Published",
-        isFavorite: true,
-    },
-    {
-        id: "entry-2",
-        title: "A few thoughts from this morning",
-        date: "October 28, 2026",
-        status: "Draft",
-        isFavorite: false,
-    },
-    {
-        id: "entry-3",
-        title: "The little things that matter",
-        date: "October 25, 2026",
-        status: "Published",
-        isFavorite: false,
-    },
-    {
-        id: "entry-4",
-        title: "An unfinished thought",
-        date: "October 22, 2026",
-        status: "Draft",
-        isFavorite: true,
-    },
-]
 
 export default function Entries() {
+    const [apiEntries, setApiEntries] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
+
+    useEffect(() => {
+        async function loadEntries() {
+            try {
+                const journalId = "17ec65a6-88db-44e3-aacf-6d81bd16fca9";
+
+                const response = await fetch(
+                    `/api/entries/?journal_id=${journalId}`
+                );
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                setApiEntries(data);
+
+                console.log("Entries from API:", data);
+            } catch (error) {
+                setFetchError(error.message);
+                console.error("Failed to load entries:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        loadEntries();
+    }, []);
+
     return (
         <div>
             <header className="flex flex-wrap items-start justify-between gap-4">
@@ -55,7 +58,7 @@ export default function Entries() {
 
                 <Button
                     nativeButton={false}
-                    render={<Link to="/entries/new" />}
+                    render={<Link to="/entries/new"/>}
                     className="h-auto min-h-11 px-5 py-3">
                     <Plus size={18} aria-hidden="true"/>
                     New Entry
@@ -66,16 +69,38 @@ export default function Entries() {
                 aria-label="Journal entries"
                 className="mt-10 space-y-4"
             >
-                {sampleEntries.map((entry) => (
-                    <EntryCard
-                        key={entry.id}
-                        title={entry.title}
-                        date={entry.date}
-                        status={entry.status}
-                        isFavorite={entry.isFavorite}
-                    />
-                ))}
+                {isLoading ? (
+                    <p className="text-sm text-[#667266]">
+                        Loading your entries...
+                    </p>
+                ) : fetchError ? (
+                    <p className="text-sm text-red-700">
+                        Unable to load entries: {fetchError}
+                    </p>
+                ) : apiEntries.length === 0 ? (
+                    <p className="text-sm text-[#667266]">
+                        No entries yet. Start writing your first entry.
+                    </p>
+                ) : (
+                    apiEntries.map((entry) => (
+                        <EntryCard
+                            key={entry.id}
+                            id={entry.id}
+                            title={entry.title}
+                            date={new Date(entry.created_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                }
+                            )}
+                            status={entry.status}
+                            isFavorite={entry.is_favorite}
+                        />
+                    ))
+                )}
             </section>
         </div>
-    )
+    );
 }

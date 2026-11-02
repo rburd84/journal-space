@@ -36,3 +36,9 @@ class EntryService:
         self.repository.save(entry)
 
         return entry
+
+    def list_entries_by_journal(
+            self,
+            journal_id: UUID,
+    ) -> list[JournalEntry]:
+        return self.repository.list_by_journal(journal_id)

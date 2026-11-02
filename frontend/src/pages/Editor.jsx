@@ -7,6 +7,43 @@ export default function Editor() {
     const [content, setContent] = useState(
         "Today I found a little space to slow down and reflect."
     );
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState(null);
+    const [savedEntry, setSavedEntry] = useState(null);
+
+    async function handleSaveDraft() {
+        if (isSaving || savedEntry) return;
+
+        setIsSaving(true);
+        setSaveError(null);
+
+        try {
+            const response = await fetch("/api/entries/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    journal_id: "17ec65a6-88db-44e3-aacf-6d81bd16fca9",
+                    title: title.trim(),
+                    content,
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to save draft (HTTP ${response.status})`);
+            }
+
+            const entry = await response.json();
+
+            setSavedEntry(entry);
+            console.log("Saved draft:", entry);
+        } catch (error) {
+            setSaveError(error.message);
+        } finally {
+            setIsSaving(false);
+        }
+    }
 
     return (
         <div className="mx-auto max-w-[760px]">
@@ -42,7 +79,7 @@ export default function Editor() {
                     className="w-full border-0 bg-transparent font-serif text-[30px] leading-tight text-ink outline-none placeholder:text-muted-foreground md:text-4xl"
                 />
 
-                <div className="my-8 h-px bg-paper-border" />
+                <div className="my-8 h-px bg-paper-border"/>
 
                 <label htmlFor="entry-content" className="sr-only">
                     Entry content
@@ -60,22 +97,42 @@ export default function Editor() {
 
             <footer className="mt-6 flex flex-wrap items-center justify-between gap-4">
                 <Button variant="outline" className="h-auto min-h-11 px-4 py-3">
-                    <Star size={18} aria-hidden="true" />
+                    <Star size={18} aria-hidden="true"/>
                     Favorite
                 </Button>
 
                 <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" className="h-auto min-h-11 px-5 py-3">
-                        Save Draft
+                    <Button
+                        variant="outline"
+                        className="h-auto min-h-11 px-5 py-3"
+                        onClick={handleSaveDraft}
+                        disabled={isSaving || savedEntry !== null || !title.trim()}
+                    >
+                        {isSaving
+                            ? "Saving..."
+                            : savedEntry
+                                ? "Draft Saved"
+                                : "Save Draft"}
                     </Button>
 
                     <Button className="h-auto min-h-11 px-5 py-3">
                         Publish
                     </Button>
                 </div>
+                {saveError && (
+                    <p role="alert" className="mt-4 text-sm text-red-700">
+                        {saveError}
+                    </p>
+                )}
+
+                {savedEntry && (
+                    <p role="status" className="mt-4 text-sm text-sage-dark">
+                        Draft saved successfully.
+                    </p>
+                )}
             </footer>
         </div>
-    )
+    );
 }
 
 
