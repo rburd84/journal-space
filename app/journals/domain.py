@@ -61,6 +61,10 @@ class JournalEntry:
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
+    def update_title(self, title: str) -> None:
+        self.title = title
+        self.updated_at = utc_now()
+
     def update_content(self, content: str) -> None:
         self.content = content
         self.updated_at = utc_now()

@@ -10,6 +10,8 @@ export default function Editor() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState(null);
     const [savedEntry, setSavedEntry] = useState(null);
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [publishError, setPublishError] = useState(null);
 
     async function handleSaveDraft() {
         if (isSaving || savedEntry) return;
@@ -45,6 +47,34 @@ export default function Editor() {
         }
     }
 
+    async function handlePublish() {
+        if (!savedEntry || isPublishing || savedEntry.status === "published") {
+            return;
+        }
+
+        setIsPublishing(true);
+        setPublishError(null);
+
+        try {
+            const response = await fetch(
+                `/api/entries/${savedEntry.id}/publish`,
+                {method: "PATCH",}
+            );
+
+            if (!response.ok) {
+                throw new Error(`Failed to publish entry (HTTP ${response.status})`);
+            }
+
+            const publishedEntry = await response.json();
+            setSavedEntry(publishedEntry);
+        } catch (error) {
+            setPublishError(error.message);
+        } finally {
+            setIsPublishing(false);
+        }
+    }
+
+
     return (
         <div className="mx-auto max-w-[760px]">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -58,7 +88,7 @@ export default function Editor() {
                 </div>
 
                 <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
-                    Draft
+                    {savedEntry?.status === "published" ? "Published" : "Draft"}
                 </span>
             </header>
 
@@ -115,10 +145,23 @@ export default function Editor() {
                                 : "Save Draft"}
                     </Button>
 
-                    <Button className="h-auto min-h-11 px-5 py-3">
-                        Publish
+                    <Button
+                        className="h-auto min-h-11 px-5 py-3"
+                        onClick={handlePublish}
+                        disabled={
+                            !savedEntry ||
+                            isPublishing ||
+                            savedEntry.status === "published"
+                        }
+                    >
+                        {isPublishing
+                            ? "Publishing..."
+                            : savedEntry?.status === "published"
+                                ? "Published"
+                                : "Publish"}
                     </Button>
                 </div>
+
                 {saveError && (
                     <p role="alert" className="mt-4 text-sm text-red-700">
                         {saveError}
@@ -130,6 +173,19 @@ export default function Editor() {
                         Draft saved successfully.
                     </p>
                 )}
+
+                {publishError && (
+                    <p role="alert" className="mt-4 text-sm text-red-700">
+                        {publishError}
+                    </p>
+                )}
+
+                {savedEntry?.status === "published" && (
+                    <p role="status" className="mt-4 text-sm text-sage-dark">
+                        Entry published successfully.
+                    </p>
+                )}
+
             </footer>
         </div>
     );
