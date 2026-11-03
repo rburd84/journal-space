@@ -14,7 +14,7 @@ export default function EntryCard({
                 <div className="min-w-0">
                     <h3 className="font-serif text-xl text-ink">
                         <Link
-                            to={`/entries/${id}`}
+                            to={`/entries/${id}/edit`}
                             className="rounded-sm hover:text-sage-dark focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sage"
                         >
                             {title}

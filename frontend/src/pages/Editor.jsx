@@ -1,39 +1,109 @@
-import {useState} from "react";
+import {useState, useEffect} from "react";
 import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
+import {useParams} from "react-router";
 
 export default function Editor() {
     const [title, setTitle] = useState("A quiet moment");
+    const {journalId, entryId} = useParams();
     const [content, setContent] = useState(
         "Today I found a little space to slow down and reflect."
     );
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadError, setLoadError] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState(null);
     const [savedEntry, setSavedEntry] = useState(null);
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishError, setPublishError] = useState(null);
+    const isEditMode = Boolean(entryId);
+
+    useEffect(() => {
+        if (!entryId) return;
+
+        const controller = new AbortController();
+
+        async function loadEntry() {
+            setIsLoading(true);
+            setLoadError(null);
+
+            try {
+                const response = await fetch(`/api/entries/${entryId}`, {
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Failed to load entry (HTTP ${response.status})`
+                    );
+                }
+
+                const entry = await response.json();
+
+                if (controller.signal.aborted) return;
+
+                setTitle(entry.title);
+                setContent(entry.content);
+                setSavedEntry(entry);
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    setLoadError(error.message);
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsLoading(false);
+                }
+            }
+        }
+
+        loadEntry();
+
+        return () => controller.abort();
+    }, [entryId]);
 
     async function handleSaveDraft() {
-        if (isSaving || savedEntry) return;
+        if (isSaving || !title.trim()) return;
 
         setIsSaving(true);
         setSaveError(null);
 
         try {
-            const response = await fetch("/api/entries/", {
-                method: "POST",
+            const isExistingEntry = savedEntry !== null;
+
+            const url = isExistingEntry
+                ? `/api/entries/${savedEntry.id}`
+                : "/api/entries/";
+
+            const response = await fetch(url, {
+                method: isExistingEntry ? "PATCH" : "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    journal_id: "17ec65a6-88db-44e3-aacf-6d81bd16fca9",
-                    title: title.trim(),
-                    content,
-                })
+                body: JSON.stringify(
+                    isExistingEntry
+                        ? {
+                            title: title.trim(),
+                            content,
+                        }
+                        : {
+                            journal_id: journalId,
+                            title: title.trim(),
+                            content,
+                        }
+                )
             });
 
             if (!response.ok) {
-                throw new Error(`Failed to save draft (HTTP ${response.status})`);
+                const errorBody = await response.text();
+
+                console.error("Save failed:", {
+                    status: response.status,
+                    body: errorBody,
+                });
+
+                throw new Error(
+                    `Failed to save entry (HTTP ${response.status}): ${errorBody}`
+                );
             }
 
             const entry = await response.json();
@@ -74,6 +144,18 @@ export default function Editor() {
         }
     }
 
+
+    if (isEditMode && isLoading) {
+        return <p className="p-6 text-muted-foreground">Loading entry...</p>;
+    }
+
+    if (isEditMode && (loadError || !savedEntry)) {
+        return (
+            <p role="alert" className="p-6 text-red-700">
+                {loadError || "Entry could not be loaded."}
+            </p>
+        );
+    }
 
     return (
         <div className="mx-auto max-w-[760px]">
@@ -136,12 +218,12 @@ export default function Editor() {
                         variant="outline"
                         className="h-auto min-h-11 px-5 py-3"
                         onClick={handleSaveDraft}
-                        disabled={isSaving || savedEntry !== null || !title.trim()}
+                        disabled={isSaving || !title.trim()}
                     >
                         {isSaving
                             ? "Saving..."
                             : savedEntry
-                                ? "Draft Saved"
+                                ? "Save Changes"
                                 : "Save Draft"}
                     </Button>
 
@@ -170,7 +252,7 @@ export default function Editor() {
 
                 {savedEntry && (
                     <p role="status" className="mt-4 text-sm text-sage-dark">
-                        Draft saved successfully.
+                        Entry saved successfully.
                     </p>
                 )}
 
@@ -190,23 +272,4 @@ export default function Editor() {
         </div>
     );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

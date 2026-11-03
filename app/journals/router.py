@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from .schemas import EntryCreate, EntryResponse
+from .schemas import EntryCreate, EntryResponse, EntryUpdate
 from .service import EntryService
 from .sql_repository import SqlEntryRepository
 from uuid import UUID
@@ -51,6 +51,23 @@ def list_entries(
 
     return service.list_entries_by_journal(journal_id)
 
+@router.get("/{entry_id}", response_model=EntryResponse)
+def get_entry(
+        entry_id: UUID,
+        db: Session = Depends(get_db),
+):
+    repository = SqlEntryRepository(db)
+
+    entry = repository.get(entry_id)
+
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Entry not found",
+        )
+
+    return entry
+
 
 @router.patch(
     "/{entry_id}/publish",
@@ -78,3 +95,31 @@ def publish_entry(
 
     db.commit()
     return published_entry
+
+
+@router.patch("/{entry_id}", response_model=EntryResponse)
+def update_entry(
+        entry_id: UUID,
+        data: EntryUpdate,
+        db: Session = Depends(get_db),
+):
+    # Development only:
+    # Authenticate and verify journal ownership
+    # before allowing updates in production.
+    repository = SqlEntryRepository(db)
+    service = EntryService(repository)
+
+    entry = repository.get(entry_id)
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Entry not found",
+        )
+
+    updated_entry = service.update_entry(
+        entry_id=entry_id,
+        title=data.title,
+        content=data.content,
+    )
+    db.commit()
+    return updated_entry

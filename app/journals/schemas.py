@@ -11,6 +11,11 @@ class EntryCreate(BaseModel):
     content: str = ""
 
 
+class EntryUpdate(BaseModel):
+    title: str
+    content: str
+
+
 class EntryResponse(BaseModel):
     id: UUID
     journal_id: UUID

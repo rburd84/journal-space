@@ -15,6 +15,8 @@ function App() {
                     <Route path="/journals" element={<Journals/>}/>
                     <Route path="/entries" element={<Entries/>}/>
                     <Route path="/entries/new" element={<Editor/>}/>
+                    <Route path="/entries/:entryId/edit" element={<Editor/>}/>
+                    <Route path="/journals/:journalId/entries/new" element={<Editor/>}/>
                     <Route path="/entries/:entryId" element={<Reader/>}/>
                 </Routes>
             </AppShell>
