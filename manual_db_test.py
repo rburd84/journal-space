@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base
-from app.journals.domain import JournalEntry
-from app.journals.models import JournalModel, EntryModel
-from app.journals.sql_repository import SqlEntryRepository
+from app.entries.domain import JournalEntry
+from app.entries.sql_repository import SqlEntryRepository
+from app.journals.models import JournalModel
 
 engine = create_engine(
     "sqlite://",
@@ -34,7 +34,6 @@ with Session(engine) as session:
 
     print("Journal saved:", journal_id)
 
-
 # Create and save a journal entry
 with Session(engine) as session:
     repository = SqlEntryRepository(session)
@@ -52,7 +51,6 @@ with Session(engine) as session:
 
     print("Entry saved:", entry_id)
 
-
 # Retrieve the entry in a new session
 with Session(engine) as session:
     repository = SqlEntryRepository(session)
@@ -64,7 +62,6 @@ with Session(engine) as session:
     print("Retrieved title:", saved_entry.title)
     print("Retrieved content:", saved_entry.content)
     print("Retrieved status:", saved_entry.status)
-
 
 # Update the entry
 with Session(engine) as session:
@@ -81,8 +78,6 @@ with Session(engine) as session:
 
     print("Entry updated and published.")
 
-
-
 # Verify the changes were saved
 with Session(engine) as session:
     repository = SqlEntryRepository(session)
@@ -92,8 +87,6 @@ with Session(engine) as session:
 
     print("Updated content:", entry.content)
     print("Updated status:", entry.status)
-
-
 
 # List all entries in the journal
 with Session(engine) as session:
@@ -106,26 +99,4 @@ with Session(engine) as session:
     for entry in entries:
         print("Entry:", entry.title)
 
-
 print("\nDatabase testing is complete.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

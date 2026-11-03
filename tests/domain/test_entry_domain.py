@@ -2,10 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.journals.domain import (
-    EntryStatus,
-    JournalEntry,
-)
+from app.entries.domain import JournalEntry, EntryStatus
 
 
 def test_new_entry_is_draft():

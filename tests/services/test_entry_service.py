@@ -1,7 +1,9 @@
 from uuid import uuid4
+
 import pytest
-from app.journals.domain import JournalEntry
-from app.journals.service import EntryService, EntryNotFoundError
+
+from app.entries.domain import JournalEntry
+from app.entries.service import EntryService, EntryNotFoundError
 
 
 class FakeEntryRepository:

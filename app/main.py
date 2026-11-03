@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
-from app.journals import models
-from app.journals.router import router, journals_router
+from app.entries.router import router as entries_router
+from app.journals.router import router as journals_router
 
 app = FastAPI(title="Journal API")
 
@@ -10,8 +10,8 @@ app = FastAPI(title="Journal API")
 # instead of create_all in production.
 Base.metadata.create_all(bind=engine)
 
-app.include_router(router)
 app.include_router(journals_router)
+app.include_router(entries_router)
 
 
 @app.get("/")
