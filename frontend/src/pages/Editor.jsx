@@ -158,7 +158,7 @@ export default function Editor() {
     }
 
     return (
-        <div className="mx-auto max-w-[760px]">
+        <div className="mx-auto w-full min-w-0 max-w-[760px]">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <p className="text-sm font-medium text-sage-dark">
@@ -188,7 +188,7 @@ export default function Editor() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Untitled entry"
-                    className="w-full border-0 bg-transparent font-serif text-[30px] leading-tight text-ink outline-none placeholder:text-muted-foreground md:text-4xl"
+                    className="block w-full min-w-0 border-0 bg-transparent font-serif text-[clamp(1.75rem,5vw,2.5rem)] leading-tight text-ink outline-none placeholder:text-muted-foreground"
                 />
 
                 <div className="my-8 h-px bg-paper-border"/>
@@ -203,7 +203,7 @@ export default function Editor() {
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Begin writing..."
                     rows={12}
-                    className="w-full resize-y border-0 bg-transparent font-serif text-[17px] leading-[1.8] text-ink outline-none placeholder:text-muted-foreground md:text-lg"
+                    className="block w-full min-w-0 resize-y border-0 bg-transparent font-serif text-[17px] leading-[1.8] text-ink outline-none placeholder:text-muted-foreground md:text-lg"
                 />
             </section>
 

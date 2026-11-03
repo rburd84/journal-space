@@ -1,6 +1,7 @@
 import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Link, useParams} from "react-router";
+import {useEffect, useState} from "react";
 
 
 const sampleEntries = [
@@ -53,9 +54,63 @@ const sampleEntries = [
 export default function Reader() {
     const {entryId} = useParams();
 
-    const entry = sampleEntries.find(
-        (item) => item.id === entryId
-    );
+    // const entry = sampleEntries.find(
+    //     (item) => item.id === entryId
+    // );
+
+    const [entry, setEntry] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const controller = new AbortController();
+
+        async function loadEntry() {
+            setIsLoading(true);
+            setError(null);
+            setEntry(null);
+
+            try {
+                const response = await fetch(`/api/entries/${entryId}`, {
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    throw new Error(
+                        response.status === 404
+                            ? "Entry not found."
+                            : `Failed to load entry (HTTP ${response.status})`
+                    );
+                }
+
+                const data = await response.json();
+
+                if (!controller.signal.aborted) {
+                    setEntry(data);
+                }
+            } catch (error) {
+                if (!controller.signal.aborted) {
+                    setError(error.message);
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsLoading(false);
+                }
+            }
+        }
+
+        void loadEntry();
+
+        return () => controller.abort();
+    }, [entryId]);
+
+    if (isLoading) {
+        return (
+            <p className="p-6 text-muted-foreground">
+                Loading entry...
+            </p>
+        );
+    }
 
     if (!entry) {
         return (
@@ -95,10 +150,9 @@ export default function Reader() {
 
                 <div className="my-8 h-px bg-paper-border"/>
 
-                <div className="space-y-6 font-serif text-[17px] leading-[1.8] text-ink md:text-lg">
-                    {entry.content.map((paragraph, index) => (
-                        <p key={index}>{paragraph}</p>
-                    ))}
+                <div
+                    className="min-w-0 whitespace-pre-wrap break-words font-serif text-[17px] leading-[1.8] text-ink md:text-lg">
+                    {entry.content}
                 </div>
             </article>
 

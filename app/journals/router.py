@@ -4,12 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from .schemas import EntryCreate, EntryResponse, EntryUpdate
-from .service import EntryService
-from .sql_repository import SqlEntryRepository
+from .schemas import (
+    EntryCreate, EntryResponse, EntryUpdate,
+    JournalCreate, JournalResponse)
+from .service import EntryService, JournalService
+from .sql_repository import SqlEntryRepository, SqlJournalRepository
 from uuid import UUID
 
 router = APIRouter(prefix="/entries", tags=["entries"])
+
+journals_router = APIRouter(
+    prefix="/journals",
+    tags=["journals"],
+)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -50,6 +57,7 @@ def list_entries(
     service = EntryService(repository)
 
     return service.list_entries_by_journal(journal_id)
+
 
 @router.get("/{entry_id}", response_model=EntryResponse)
 def get_entry(
@@ -123,3 +131,62 @@ def update_entry(
     )
     db.commit()
     return updated_entry
+
+
+@journals_router.post(
+    "/",
+    response_model=JournalResponse,
+    status_code=201,
+)
+def create_journal(
+        data: JournalCreate,
+        db: Session = Depends(get_db),
+):
+    service = JournalService(SqlJournalRepository(db))
+
+    try:
+        journal = service.create_journal(
+            user_id=data.user_id,
+            title=data.title,
+            journal_type=data.type,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=str(error),
+        ) from error
+
+    db.commit()
+    return journal
+
+
+@journals_router.get(
+    "/",
+    response_model=list[JournalResponse],
+)
+def list_journals(
+        user_id: UUID,
+        db: Session = Depends(get_db),
+):
+    service = JournalService(SqlJournalRepository(db))
+    return service.list_journals(user_id)
+
+
+@journals_router.get(
+    "/{journal_id}",
+    response_model=JournalResponse,
+)
+def get_journal(
+        journal_id: UUID,
+        db: Session = Depends(get_db),
+):
+    service = JournalService(SqlJournalRepository(db))
+    journal = service.get_journal(journal_id)
+
+    if journal is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Journal not found",
+        )
+
+    return journal

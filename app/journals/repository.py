@@ -11,6 +11,9 @@ class JournalRepository(Protocol):
     def save(self, journal: Journal) -> None:
         pass
 
+    def list_by_user(self, user_id: UUID) -> list[JournalEntry] | None:
+        pass
+
 
 class EntryRepository(Protocol):
     def get(self, entry_id: UUID) -> JournalEntry | None:
