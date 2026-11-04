@@ -1,43 +1,89 @@
 import {Plus} from "lucide-react";
-import {Link} from "react-router";
+import {Link, useParams} from "react-router";
 import {useEffect, useState} from "react";
 
 import EntryCard from "@/components/EntryCard";
 import {Button} from "@/components/ui/button";
+import {getEntries, getJournal} from "@/lib/api.js";
 
 
 export default function Entries() {
+    const {journalId} = useParams();
     const [apiEntries, setApiEntries] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
+    const [journal, setJournal] = useState(null);
+    const [entries, setEntries] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    // useEffect(() => {
+    //     async function loadEntries() {
+    //         try {
+    //             const journalId = "17ec65a6-88db-44e3-aacf-6d81bd16fca9";
+    //
+    //             const response = await fetch(
+    //                 `/api/entries/?journal_id=${journalId}`
+    //             );
+    //
+    //             if (!response.ok) {
+    //                 throw new Error(`HTTP ${response.status}`);
+    //             }
+    //
+    //             const data = await response.json();
+    //             setApiEntries(data);
+    //
+    //             console.log("Entries from API:", data);
+    //         } catch (error) {
+    //             setFetchError(error.message);
+    //             console.error("Failed to load entries:", error);
+    //         } finally {
+    //             setIsLoading(false);
+    //         }
+    //     }
+    //
+    //     loadEntries();
+    // }, []);
 
     useEffect(() => {
-        async function loadEntries() {
+        if (!journalId) {
+            setLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+
+        async function loadJournalEntries() {
+            setLoading(true);
+            setError("");
+
             try {
-                const journalId = "17ec65a6-88db-44e3-aacf-6d81bd16fca9";
+                const [journalData, entriesData] = await Promise.all([
+                    getJournal(journalId),
+                    getEntries(journalId),
+                ]);
 
-                const response = await fetch(
-                    `/api/entries/?journal_id=${journalId}`
-                );
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                if (!cancelled) {
+                    setJournal(journalData);
+                    setEntries(entriesData);
                 }
-
-                const data = await response.json();
-                setApiEntries(data);
-
-                console.log("Entries from API:", data);
             } catch (error) {
-                setFetchError(error.message);
-                console.error("Failed to load entries:", error);
+                if (!cancelled) {
+                    setError(error.message);
+                }
             } finally {
-                setIsLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
         }
 
-        loadEntries();
-    }, []);
+        void loadJournalEntries();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [journalId]);
 
     return (
         <div>
@@ -48,7 +94,7 @@ export default function Entries() {
                     </p>
 
                     <h2 className="font-serif text-3xl text-ink md:text-4xl">
-                        Your entries
+                        {journal?.title ?? "Journal Entries"}
                     </h2>
 
                     <p className="mt-4 text-muted-foreground">
@@ -58,7 +104,11 @@ export default function Entries() {
 
                 <Button
                     nativeButton={false}
-                    render={<Link to="/entries/new"/>}
+                    render={<Link to={
+                                      journalId
+                                          ? `/journals/${journalId}/entries/new`
+                                          : "/entries/new"
+                                  }/>}
                     className="h-auto min-h-11 px-5 py-3">
                     <Plus size={18} aria-hidden="true"/>
                     New Entry

@@ -1,18 +1,43 @@
 import {Plus} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import JournalCard from "@/components/JournalCard";
+import {useEffect, useState} from "react";
+import {getJournals} from "@/lib/api.js";
+import {DEV_USER_ID} from "@/lib/devUser.js";
+import {Link} from "react-router";
 
-const sampleJournals = [{
-    id: "journal-1", title: "Daily Reflections", description: "Personal journal",
-}, {
-    id: "journal-2", title: "Small Moments", description: "Personal journal",
-}, {
-    id: "journal-3", title: "Ideas & Notes", description: "Creative journal",
-}, {
-    id: "journal-4", title: "Evening Pages", description: "Personal journal",
-},]
+// const sampleJournals = [{
+//     id: "journal-1", title: "Daily Reflections", description: "Personal journal",
+// }, {
+//     id: "journal-2", title: "Small Moments", description: "Personal journal",
+// }, {
+//     id: "journal-3", title: "Ideas & Notes", description: "Creative journal",
+// }, {
+//     id: "journal-4", title: "Evening Pages", description: "Personal journal",
+// },]
 
 export default function Journals() {
+    const [journals, setJournals] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        async function loadJournals() {
+            try {
+                const data = await getJournals(DEV_USER_ID);
+                setJournals(data);
+            } catch (error) {
+                setError(error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        void loadJournals();
+    }, []);
+
+    if (loading) return <p>Loading journals...</p>;
+    if (error) return <p role="alert">{error}</p>;
+
     return (<div>
         <header className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -38,14 +63,27 @@ export default function Journals() {
         <section
             aria-label="Journal collection"
             className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-            {sampleJournals.map((journal) => (<JournalCard
-                    key={journal.id}
-                    title={journal.title}
-                    description={journal.description}
-                />))}
+            {journals.length === 0 ? (
+                <p>No journals yet. Create your first journal.</p>
+            ) : (
+                <div>
+                    {journals.map((journal) => (
+                        <Link
+                            key={journal.id}
+                            to={`/journals/${journal.id}/entries`}
+                        >
+                            {journal.title}
+                        </Link>
+                    ))}
+                </div>
+            )}
+            {/*{sampleJournals.map((journal) => (<JournalCard*/}
+            {/*    key={journal.id}*/}
+            {/*    title={journal.title}*/}
+            {/*    description={journal.description}*/}
+            {/*/>))}*/}
         </section>
-    </div>)
+    </div>);
 }
 
 

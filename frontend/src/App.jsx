@@ -14,6 +14,7 @@ function App() {
                     <Route path="/" element={<Home/>}/>
                     <Route path="/journals" element={<Journals/>}/>
                     <Route path="/entries" element={<Entries/>}/>
+                    <Route path="/journals/:journalId/entries" element={<Entries/>}/>
                     <Route path="/entries/new" element={<Editor/>}/>
                     <Route path="/entries/:entryId/edit" element={<Editor/>}/>
                     <Route path="/journals/:journalId/entries/new" element={<Editor/>}/>
