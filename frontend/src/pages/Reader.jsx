@@ -54,9 +54,6 @@ const sampleEntries = [
 export default function Reader() {
     const {entryId} = useParams();
 
-    // const entry = sampleEntries.find(
-    //     (item) => item.id === entryId
-    // );
 
     const [entry, setEntry] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -171,7 +168,7 @@ export default function Reader() {
 
                 <Button
                     nativeButton={false}
-                    render={<Link to="/entries/new"/>}
+                    render={<Link to={`/entries/${entry.id}/edit`}/>}
                     className="h-auto min-h-11 px-5 py-3"
                 >
                     Edit Entry

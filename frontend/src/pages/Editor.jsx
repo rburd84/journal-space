@@ -1,11 +1,13 @@
 import {useEffect, useState} from "react";
 import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import {useParams} from "react-router";
+import {Link, useParams} from "react-router";
+import {DEV_USER_ID} from "@/lib/devUser.js";
+import {getJournals} from "@/lib/api.js";
 
 export default function Editor() {
-    const [title, setTitle] = useState("A quiet moment");
     const {journalId, entryId} = useParams();
+    const [title, setTitle] = useState("A quiet moment");
     const [content, setContent] = useState(
         "Today I found a little space to slow down and reflect."
     );
@@ -16,7 +18,14 @@ export default function Editor() {
     const [savedEntry, setSavedEntry] = useState(null);
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishError, setPublishError] = useState(null);
+    const [selectedJournalId, setSelectedJournalId] = useState(journalId ?? "");
+    const [availableJournals, setAvailableJournals] = useState([]);
+    const [journalsLoading, setJournalsLoading] = useState(false);
+    const [journalsError, setJournalsError] = useState("");
     const isEditMode = Boolean(entryId);
+    const effectiveJournalId = isEditMode
+        ? savedEntry?.journal_id
+        : journalId || selectedJournalId;
 
     useEffect(() => {
         if (!entryId) return;
@@ -56,13 +65,52 @@ export default function Editor() {
             }
         }
 
-        loadEntry();
+        void loadEntry();
 
         return () => controller.abort();
     }, [entryId]);
 
+    useEffect(() => {
+        if (journalId || entryId) return;
+
+        let cancelled = false;
+
+        async function loadJournals() {
+            setJournalsLoading(true);
+            setJournalsError("");
+
+            try {
+                const data = await getJournals(DEV_USER_ID);
+
+                if (!cancelled) {
+                    setAvailableJournals(
+                        data.filter((journal) => !journal.is_archived)
+                    );
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setJournalsError(error.message);
+                }
+            } finally {
+                if (!cancelled) {
+                    setJournalsLoading(false);
+                }
+            }
+        }
+
+        void loadJournals();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [journalId, entryId]);
+
     async function handleSaveDraft() {
-        if (isSaving || !title.trim()) return;
+        if (
+            isSaving ||
+            !title.trim() ||
+            (!savedEntry && !effectiveJournalId)
+        ) return;
 
         setIsSaving(true);
         setSaveError(null);
@@ -86,7 +134,7 @@ export default function Editor() {
                             content,
                         }
                         : {
-                            journal_id: journalId,
+                            journal_id: effectiveJournalId,
                             title: title.trim(),
                             content,
                         }
@@ -161,11 +209,61 @@ export default function Editor() {
         <div className="mx-auto w-full min-w-0 max-w-[760px]">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <p className="text-sm font-medium text-sage-dark">
-                        Daily Reflections
-                    </p>
+                    {/*<p className="text-sm font-medium text-sage-dark">*/}
+                    {/*    Daily Reflections*/}
+                    {/*</p>*/}
+                    {!isEditMode && !journalId ? (
+                        <div>
+                            <label
+                                htmlFor="entry-journal"
+                                className="mb-2 block text-sm font-medium text-sage-dark"
+                            >
+                                Write in journal
+                            </label>
+
+                            {journalsLoading ? (
+                                <p className="text-sm text-muted-foreground">
+                                    Loading journals...
+                                </p>
+                            ) : journalsError ? (
+                                <p role="alert" className="text-sm text-red-700">
+                                    Unable to load journals: {journalsError}
+                                </p>
+                            ) : availableJournals.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    No active journals.{" "}
+                                    <Link to="/journals" className="text-sage-dark underline">
+                                        Create a journal
+                                    </Link>
+                                </p>
+                            ) : (
+                                <select
+                                    id="entry-journal"
+                                    value={selectedJournalId}
+                                    onChange={e => setSelectedJournalId(e.target.value)}
+                                    className="rounded-lg border border-paper-border bg-paper px-3 py-2 text-sm text-ink outline-none"
+                                >
+                                    <option value="">Select a journal</option>
+
+                                    {availableJournals.map((journal) => (
+                                        <option key={journal.id} value={journal.id}>
+                                            {journal.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-sm font-medium text-sage-dark">
+                            {availableJournals.find((journal) => journal.id === effectiveJournalId)?.title
+                                ?? "Journal Entry"}
+                        </p>
+                    )}
+
                     <p className="mt-1 text-sm text-muted-foreground">
-                        October 31, 2026
+                        {savedEntry?.created_at
+                            ? new Date(savedEntry.created_at).toLocaleDateString()
+                            : new Date().toLocaleDateString()}
                     </p>
                 </div>
 
@@ -218,7 +316,11 @@ export default function Editor() {
                         variant="outline"
                         className="h-auto min-h-11 px-5 py-3"
                         onClick={handleSaveDraft}
-                        disabled={isSaving || !title.trim()}
+                        disabled={
+                            isSaving ||
+                            !title.trim() ||
+                            (!savedEntry && !effectiveJournalId)
+                        }
                     >
                         {isSaving
                             ? "Saving..."
