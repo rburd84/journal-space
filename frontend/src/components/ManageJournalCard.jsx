@@ -1,4 +1,4 @@
-import {Archive, BookOpen, Ellipsis, Pencil} from "lucide-react";
+import {Archive, BookOpen, Ellipsis, Pencil, RotateCcw} from "lucide-react";
 import {useState} from "react";
 
 import {Button} from "@/components/ui/button.jsx";
@@ -7,7 +7,8 @@ import {Link} from "react-router";
 export default function ManageJournalCard({
                                               journal,
                                               onRename,
-                                              onArchive
+                                              onArchive,
+                                              onRestore,
                                           }) {
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -43,17 +44,31 @@ export default function ManageJournalCard({
                             Rename
                         </button>
 
-                        <button
-                            type="button"
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#E9EDE5]"
-                            onClick={() => {
-                                setMenuOpen(false);
-                                onArchive(journal);
-                            }}
-                        >
-                            <Archive size={16}/>
-                            Archive
-                        </button>
+                        {journal.is_archived ? (
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#E9EDE5]"
+                                onClick={() => {
+                                    setMenuOpen(false);
+                                    onRestore(journal);
+                                }}
+                            >
+                                <RotateCcw size={16}/>
+                                Restore
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#E9EDE5]"
+                                onClick={() => {
+                                    setMenuOpen(false);
+                                    onArchive(journal);
+                                }}
+                            >
+                                <Archive size={16}/>
+                                Archive
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

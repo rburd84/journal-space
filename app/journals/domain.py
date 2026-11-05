@@ -29,3 +29,6 @@ class Journal:
 
     def archive(self) -> None:
         self.is_archived = True
+
+    def restore(self) -> None:
+        self.is_archived = False

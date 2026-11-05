@@ -1,19 +1,10 @@
 import {useEffect, useState} from "react";
-import {archiveJournal, getJournals} from "@/lib/api.js";
+import {archiveJournal, getJournals, restoreJournal} from "@/lib/api.js";
 import {DEV_USER_ID} from "@/lib/devUser.js";
 import CreateJournalDialog from "@/components/CreateJournalDialog.jsx";
 import ManageJournalCard from "@/components/ManageJournalCard.jsx";
 import {Button} from "@/components/ui/button.jsx";
 
-// const sampleJournals = [{
-//     id: "journal-1", title: "Daily Reflections", description: "Personal journal",
-// }, {
-//     id: "journal-2", title: "Small Moments", description: "Personal journal",
-// }, {
-//     id: "journal-3", title: "Ideas & Notes", description: "Creative journal",
-// }, {
-//     id: "journal-4", title: "Evening Pages", description: "Personal journal",
-// },]
 
 export default function Journals() {
     const [journals, setJournals] = useState([]);
@@ -23,6 +14,14 @@ export default function Journals() {
     const [renameTitle, setRenameTitle] = useState("");
     const [actionError, setActionError] = useState("");
     const [saving, setSaving] = useState(false);
+    const [view, setView] = useState("active");
+
+
+    const visibleJournals = journals.filter(journal =>
+        view === "active"
+            ? !journal.is_archived
+            : journal.is_archived
+    );
 
     function startRename(journal) {
         setJournalToRename(journal);
@@ -105,6 +104,21 @@ export default function Journals() {
         }
     }
 
+    async function handleRestore(journal) {
+        setError("");
+
+        try {
+            const updated = await restoreJournal(journal.id);
+
+            setJournals((current) =>
+                current.map((item) =>
+                    item.id === updated.id ? updated : item)
+            );
+        } catch (error) {
+            setActionError(error.message);
+        }
+    }
+
     if (loading) return <p>Loading journals...</p>;
     if (error) return <p role="alert">{error}</p>;
 
@@ -127,24 +141,73 @@ export default function Journals() {
             <CreateJournalDialog onCreated={handleJournalCreated}/>
         </header>
 
+        <div className="mt-8 flex gap-2">
+            <button
+                type="button"
+                onClick={() => setView("active")}
+                aria-pressed={view === "active"}
+                className={`rounded-lg px-4 py-2 text-sm ${
+                    view === "active"
+                        ? "bg-sage text-white"
+                        : "border border-[#E8E4D8] text-ink"
+                }`}
+            >
+                Active
+            </button>
+
+            <button
+                type="button"
+                onClick={() => setView("archived")}
+                aria-pressed={view === "archived"}
+                className={`rounded-lg px-4 py-2 text-sm ${
+                    view === "archived"
+                        ? "bg-sage text-white"
+                        : "border border-[#E8E4D8] text-ink"
+                }`}
+            >
+                Archived
+            </button>
+        </div>
+
+
+        {/* JOURNAL GRID */}
         <section
             aria-label="Journal collection"
             className="mt-10 grid w-full grid-cols-1 gap-5 md:grid-cols-2">
-            {journals.filter(journal => !journal.is_archived).length === 0 ? (
-                <p className="text-[#6B7168] md:col-span-2">
-                    No active journals yet. Create your first journal.
+            {visibleJournals.length === 0 ? (
+                <p>
+                    {view === "active"
+                        ? "No active journals yet. Create your first journal."
+                        : "No archived journals."}
                 </p>
             ) : (
-                journals
-                    .filter(journal => !journal.is_archived)
-                    .map((journal) => (
-                        <ManageJournalCard
-                            key={journal.id}
-                            journal={journal}
-                            onRename={startRename}
-                            onArchive={handleArchive}
-                        />
-                    )))}
+                visibleJournals.map((journal) => (
+                    <ManageJournalCard
+                        key={journal.id}
+                        journal={journal}
+                        onRename={startRename}
+                        onArchive={handleArchive}
+                        onRestore={handleRestore}
+                    />
+                ))
+            )}
+
+            {/*{journals.filter(journal => !journal.is_archived).length === 0 ? (*/}
+            {/*    <p className="text-[#6B7168] md:col-span-2">*/}
+            {/*        No active journals yet. Create your first journal.*/}
+            {/*    </p>*/}
+            {/*) : (*/}
+            {/*    journals*/}
+            {/*        .filter(journal => !journal.is_archived)*/}
+            {/*        .map((journal) => (*/}
+            {/*            <ManageJournalCard*/}
+            {/*                key={journal.id}*/}
+            {/*                journal={journal}*/}
+            {/*                onRename={startRename}*/}
+            {/*                onArchive={handleArchive}*/}
+            {/*            />*/}
+            {/*        ))*/}
+            {/*)}*/}
         </section>
 
         {journalToRename && (

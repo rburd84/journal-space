@@ -61,3 +61,14 @@ class JournalService:
         journal.archive()
         self.repository.save(journal)
         return journal
+
+    def restore_journal(self, journal_id: UUID) -> Journal:
+        journal = self.repository.get(journal_id)
+
+        if journal is None:
+            raise JournalNotFoundError(journal_id)
+
+        journal.restore()
+        self.repository.save(journal)
+
+        return journal

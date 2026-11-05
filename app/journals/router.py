@@ -124,3 +124,37 @@ def archive_journal(
 
     db.commit()
     return journal
+
+@router.patch(
+    "/{journal_id}/restore",
+    response_model=JournalResponse,
+)
+def restore_journal(
+        journal_id: UUID,
+        db: Session = Depends(get_db),
+):
+    service = JournalService(SqlJournalRepository(db))
+
+    try:
+        journal = service.restore_journal(journal_id)
+    except JournalNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Journal not found",
+        )
+
+    db.commit()
+    return journal
+
+
+
+
+
+
+
+
+
+
+
+
+
