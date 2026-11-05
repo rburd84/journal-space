@@ -4,6 +4,10 @@ from .domain import Journal, JournalType
 from .repository import JournalRepository
 
 
+class JournalNotFoundError(Exception):
+    pass
+
+
 class JournalService:
     def __init__(self, repository: JournalRepository):
         self.repository = repository
@@ -33,3 +37,27 @@ class JournalService:
 
     def list_journals(self, user_id: UUID) -> list[Journal]:
         return self.repository.list_by_user(user_id)
+
+    def rename_journal(
+            self,
+            journal_id: UUID,
+            title: str,
+    ) -> Journal:
+        journal = self.repository.get(journal_id)
+
+        if journal is None:
+            raise JournalNotFoundError(journal_id)
+
+        journal.rename(title)
+        self.repository.save(journal)
+        return journal
+
+    def archive_journal(self, journal_id: UUID) -> Journal:
+        journal = self.repository.get(journal_id)
+
+        if journal is None:
+            raise JournalNotFoundError(journal_id)
+
+        journal.archive()
+        self.repository.save(journal)
+        return journal

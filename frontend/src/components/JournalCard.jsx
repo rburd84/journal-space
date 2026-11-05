@@ -1,14 +1,21 @@
 import {BookOpen} from "lucide-react";
-import {Component} from "react";
 
 export default function JournalCard({title, description}) {
     return (
-        <article className="rounded-xl border border-paper-border bg-paper p-5">
-            <BookOpen size={22} className="mb-4 text-sage" aria-hidden="true" />
+        <article className="rounded-2xl border border-[#E8E4D8] bg-paper p-6">
+            <BookOpen
+                size={24}
+                className="mb-5 text-sage"
+                aria-hidden="true"
+            />
 
-            <h3 className="font-serif text-xl text-ink">{title}</h3>
+            <h2 className="font-serif text-2xl text-ink">
+                {title}
+            </h2>
 
-            <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-2 text-sm text-[#6B7168]">
+                {description}
+            </p>
         </article>
-    )
+    );
 }

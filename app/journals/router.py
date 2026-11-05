@@ -3,8 +3,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .schemas import JournalCreate, JournalResponse
-from .service import JournalService
+from .schemas import JournalCreate, JournalResponse, JournalRename
+from .service import JournalService, JournalNotFoundError
 from .sql_repository import SqlJournalRepository
 from ..core.dependencies import get_db
 
@@ -70,4 +70,57 @@ def get_journal(
             detail="Journal not found",
         )
 
+    return journal
+
+
+@router.patch(
+    "/{journal_id}/rename",
+    response_model=JournalResponse,
+)
+def rename_journal(
+        journal_id: UUID,
+        data: JournalRename,
+        db: Session = Depends(get_db),
+):
+    service = JournalService(SqlJournalRepository(db))
+
+    try:
+        journal = service.rename_journal(
+            journal_id,
+            data.title,
+        )
+    except JournalNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Journal not found",
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=422,
+            detail=str(error),
+        ) from error
+
+    db.commit()
+    return journal
+
+
+@router.patch(
+    "/{journal_id}/archive",
+    response_model=JournalResponse,
+)
+def archive_journal(
+        journal_id: UUID,
+        db: Session = Depends(get_db),
+):
+    service = JournalService(SqlJournalRepository(db))
+
+    try:
+        journal = service.archive_journal(journal_id)
+    except JournalNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Journal not found",
+        )
+
+    db.commit()
     return journal

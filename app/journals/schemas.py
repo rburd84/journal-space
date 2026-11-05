@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .domain import JournalType
 
@@ -17,3 +17,7 @@ class JournalResponse(BaseModel):
     title: str
     type: JournalType
     is_archived: bool
+
+
+class JournalRename(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
