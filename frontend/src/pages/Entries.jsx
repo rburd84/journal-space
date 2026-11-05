@@ -9,41 +9,11 @@ import {getEntries, getJournal} from "@/lib/api.js";
 
 export default function Entries() {
     const {journalId} = useParams();
-    const [apiEntries, setApiEntries] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [fetchError, setFetchError] = useState(null);
     const [journal, setJournal] = useState(null);
     const [entries, setEntries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    // useEffect(() => {
-    //     async function loadEntries() {
-    //         try {
-    //             const journalId = "17ec65a6-88db-44e3-aacf-6d81bd16fca9";
-    //
-    //             const response = await fetch(
-    //                 `/api/entries/?journal_id=${journalId}`
-    //             );
-    //
-    //             if (!response.ok) {
-    //                 throw new Error(`HTTP ${response.status}`);
-    //             }
-    //
-    //             const data = await response.json();
-    //             setApiEntries(data);
-    //
-    //             console.log("Entries from API:", data);
-    //         } catch (error) {
-    //             setFetchError(error.message);
-    //             console.error("Failed to load entries:", error);
-    //         } finally {
-    //             setIsLoading(false);
-    //         }
-    //     }
-    //
-    //     loadEntries();
-    // }, []);
 
     useEffect(() => {
         if (!journalId) {
@@ -119,20 +89,20 @@ export default function Entries() {
                 aria-label="Journal entries"
                 className="mt-10 space-y-4"
             >
-                {isLoading ? (
+                {loading ? (
                     <p className="text-sm text-[#667266]">
                         Loading your entries...
                     </p>
-                ) : fetchError ? (
+                ) : error ? (
                     <p className="text-sm text-red-700">
-                        Unable to load entries: {fetchError}
+                        Unable to load entries: {error}
                     </p>
-                ) : apiEntries.length === 0 ? (
+                ) : entries.length === 0 ? (
                     <p className="text-sm text-[#667266]">
                         No entries yet. Start writing your first entry.
                     </p>
                 ) : (
-                    apiEntries.map((entry) => (
+                    entries.map((entry) => (
                         <EntryCard
                             key={entry.id}
                             id={entry.id}

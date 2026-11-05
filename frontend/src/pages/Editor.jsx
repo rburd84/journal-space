@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import {useEffect, useState} from "react";
 import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {useParams} from "react-router";
@@ -188,7 +188,7 @@ export default function Editor() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Untitled entry"
-                    className="block w-full min-w-0 border-0 bg-transparent font-serif text-[clamp(1.75rem,5vw,2.5rem)] leading-tight text-ink outline-none placeholder:text-muted-foreground"
+                    className="block w-full min-w-0 border-0 bg-transparent font-serif text-[clamp(1.75rem,5vw,2.5rem)] leading-tight text-ink outline-none"
                 />
 
                 <div className="my-8 h-px bg-paper-border"/>
@@ -203,7 +203,7 @@ export default function Editor() {
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Begin writing..."
                     rows={12}
-                    className="block w-full min-w-0 resize-y border-0 bg-transparent font-serif text-[17px] leading-[1.8] text-ink outline-none placeholder:text-muted-foreground md:text-lg"
+                    className="block w-full min-w-0 resize-y border-0 bg-transparent font-serif text-[17px] leading-[1.8] text-ink outline-none md:text-lg"
                 />
             </section>
 
