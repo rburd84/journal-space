@@ -11,5 +11,8 @@ class EntryRepository(Protocol):
     def save(self, entry: JournalEntry) -> None:
         pass
 
+    def delete(self, entry_id: UUID) -> bool:
+        pass
+
     def list_by_journal(self, journal_id: UUID) -> list[JournalEntry] | None:
         pass

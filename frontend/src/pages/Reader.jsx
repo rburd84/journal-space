@@ -1,18 +1,21 @@
-import {Star} from "lucide-react";
+import {Star, Trash2} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import {Link, useParams} from "react-router";
+import {Link, useNavigate, useParams} from "react-router";
 import {useEffect, useState} from "react";
 import {getJournal} from "@/lib/api.js";
 
 
 export default function Reader() {
     const {entryId} = useParams();
+    const navigate = useNavigate();
     const [entry, setEntry] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [journalTitle, setJournalTitle] = useState("");
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
     const [favoriteError, setFavoriteError] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState(null);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -107,6 +110,40 @@ export default function Reader() {
         }
     }
 
+    async function handleDelete() {
+        if (!entry || isDeleting) return;
+
+        const confirmed = window.confirm(
+            "Delete this entry permanently? This action cannot be undone."
+        );
+
+        if (!confirmed) return;
+
+        setIsDeleting(true);
+        setDeleteError(null);
+
+        try {
+            const response = await fetch(
+                `/api/entries/${entry.id}`,
+                {method: "DELETE"}
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to delete entry (HTTP ${response.status})`
+                );
+            }
+
+            navigate(`/journals/${entry.journal_id}/entries`, {
+                replace: true,
+            });
+        } catch (error) {
+            setDeleteError(error.message);
+        } finally {
+            setIsDeleting(false);
+        }
+    }
+
     if (isLoading) {
         return (
             <p className="p-6 text-muted-foreground">
@@ -188,13 +225,31 @@ export default function Reader() {
                     </p>
                 )}
 
-                <Button
-                    nativeButton={false}
-                    render={<Link to={`/entries/${entry.id}/edit`}/>}
-                    className="h-auto min-h-11 px-5 py-3"
-                >
-                    Edit Entry
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        nativeButton={false}
+                        render={<Link to={`/entries/${entry.id}/edit`}/>}
+                        className="h-auto min-h-11 px-5 py-3"
+                    >
+                        Edit Entry
+                    </Button>
+
+                    <Button
+                        variant="outline"
+                        className="h-auto min-h-11 px-4 py-3 text-red-700"
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                    >
+                        <Trash2 size={18} aria-hidden={true}/>
+                        {isDeleting ? "Deleting..." : "Delete Entry"}
+                    </Button>
+
+                    {deleteError && (
+                        <p role="alert" className="w-full text-sm text-red-700">
+                            {deleteError}
+                        </p>
+                    )}
+                </div>
             </footer>
         </div>
     );

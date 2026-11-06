@@ -148,3 +148,25 @@ def toggle_entry_favorite(
 
     db.commit()
     return entry
+
+
+@router.delete("/{entry_id}", status_code=204)
+def delete_entry(
+        entry_id: UUID,
+        db: Session = Depends(get_db),
+):
+    # Development only:
+    # Authenticate and verify journal ownership
+    # before enabling this endpoint in production.
+    repository = SqlEntryRepository(db)
+    service = EntryService(repository)
+
+    try:
+        service.delete_entry(entry_id)
+    except EntryNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Entry not found",
+        )
+
+    db.commit()

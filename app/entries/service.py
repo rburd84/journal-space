@@ -27,6 +27,12 @@ class EntryService:
         self.repository.save(entry)
         return entry
 
+    def delete_entry(self, entry_id: UUID) -> None:
+        deleted = self.repository.delete(entry_id)
+
+        if not deleted:
+            raise EntryNotFoundError(entry_id)
+
     def publish_entry(self, entry_id: UUID) -> JournalEntry:
         entry = self.repository.get(entry_id)
 

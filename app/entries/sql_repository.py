@@ -45,6 +45,17 @@ class SqlEntryRepository:
 
         self.session.flush()
 
+    def delete(self, entry_id: UUID) -> bool:
+        model = self.session.get(EntryModel, entry_id)
+
+        if model is None:
+            return False
+
+        self.session.delete(model)
+        self.session.flush()
+        
+        return True
+
     def list_by_journal(self, journal_id: UUID) -> list[JournalEntry]:
         models = self.session.scalars(
             select(EntryModel)
