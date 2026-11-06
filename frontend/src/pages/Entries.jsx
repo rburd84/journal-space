@@ -16,6 +16,7 @@ export default function Entries() {
     const [error, setError] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [favoritesOnly, setFavoritesOnly] = useState(false);
+    const [journalNames, setJournalNames] = useState([]);
 
 
     useEffect(() => {
@@ -26,6 +27,7 @@ export default function Entries() {
             setError("");
             setJournal(null);
             setEntries([]);
+            setJournalNames({});
 
             try {
                 if (journalId) {
@@ -45,11 +47,19 @@ export default function Entries() {
                         (journal) => !journal.is_archived
                     );
 
+                    const namesById = Object.fromEntries(
+                        activeJournals.map((journal) => [
+                            journal.id,
+                            journal.title,
+                        ])
+                    );
+
                     const entriesByJournal = await Promise.all(
                         activeJournals.map(journal => getEntries(journal.id))
                     );
 
                     if (!cancelled) {
+                        setJournalNames(namesById);
                         setEntries(entriesByJournal.flat());
                     }
                 }
@@ -189,6 +199,11 @@ export default function Entries() {
                             )}
                             status={entry.status}
                             isFavorite={entry.is_favorite}
+                            journalName={
+                                !journalId
+                                    ? journalNames[entry.journal_id]
+                                    : undefined
+                            }
                         />
                     ))
                 )}

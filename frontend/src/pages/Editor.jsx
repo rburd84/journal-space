@@ -3,13 +3,13 @@ import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Link, useParams} from "react-router";
 import {DEV_USER_ID} from "@/lib/devUser.js";
-import {getJournals} from "@/lib/api.js";
+import {getJournal, getJournals} from "@/lib/api.js";
 
 export default function Editor() {
     const {journalId, entryId} = useParams();
-    const [title, setTitle] = useState("A quiet moment");
+    const [title, setTitle] = useState("");
     const [content, setContent] = useState(
-        "Today I found a little space to slow down and reflect."
+        ""
     );
     const [isLoading, setIsLoading] = useState(false);
     const [loadError, setLoadError] = useState(null);
@@ -25,6 +25,7 @@ export default function Editor() {
     const [journalsError, setJournalsError] = useState("");
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
     const [favoriteError, setFavoriteError] = useState(null);
+    const [currentJournal, setCurrentJournal] = useState(null);
     const isEditMode = Boolean(entryId);
     const effectiveJournalId = isEditMode
         ? savedEntry?.journal_id
@@ -108,6 +109,35 @@ export default function Editor() {
             cancelled = true;
         };
     }, [journalId, entryId]);
+
+    useEffect(() => {
+        if (!effectiveJournalId) {
+            setCurrentJournal(null);
+            return;
+        }
+
+        let cancelled = false;
+
+        async function loadCurrentJournal() {
+            setCurrentJournal(null);
+
+            try {
+                const journalData = await getJournal(effectiveJournalId);
+
+                if (!cancelled) {
+                    setCurrentJournal(journalData);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    console.error("Failed to load journal details:", error);
+                }
+            }
+        }
+
+        void loadCurrentJournal();
+
+        return () => cancelled = true;
+    }, [effectiveJournalId]);
 
     async function handleSaveDraft() {
         if (
@@ -284,8 +314,7 @@ export default function Editor() {
                         </div>
                     ) : (
                         <p className="text-sm font-medium text-sage-dark">
-                            {availableJournals.find((journal) => journal.id === effectiveJournalId)?.title
-                                ?? "Journal Entry"}
+                            {currentJournal?.title ?? "Journal Entry"}
                         </p>
                     )}
 
@@ -407,10 +436,22 @@ export default function Editor() {
                     </p>
                 )}
 
-                {saveSuccess && (
-                    <p role="status" className="mt-4 text-sm text-sage-dark">
-                        Entry saved successfully.
-                    </p>
+                {saveSuccess && savedEntry && (
+                    <div
+                        role="status"
+                        className="mt-4 flex flex-wrap items-center gap-3 text-sm"
+                    >
+                        <span className="text-sage-dark">
+                            Entry saved successfully.
+                        </span>
+
+                        <Link
+                            to={`/entries/${savedEntry.id}`}
+                            className="font-medium text-sage-dark underline underline-offset-4 hover:text-ink"
+                        >
+                            View Entry
+                        </Link>
+                    </div>
                 )}
 
                 {publishError && (

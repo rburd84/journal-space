@@ -7,6 +7,7 @@ export default function EntryCard({
                                       date,
                                       status,
                                       isFavorite,
+                                      journalName,
                                   }) {
     return (
         <article className="rounded-xl border border-paper-border bg-paper p-5 md:p-6">
@@ -23,6 +24,12 @@ export default function EntryCard({
 
                     <p className="mt-2 text-sm text-muted-foreground">
                         {date}
+                        {journalName && (
+                            <>
+                                <span aria-hidden="true"> · </span>
+                                <span>{journalName}</span>
+                            </>
+                        )}
                     </p>
                 </div>
 
