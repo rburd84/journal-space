@@ -4,7 +4,8 @@ import {useEffect, useState} from "react";
 
 import EntryCard from "@/components/EntryCard";
 import {Button} from "@/components/ui/button";
-import {getEntries, getJournal} from "@/lib/api.js";
+import {getEntries, getJournal, getJournals} from "@/lib/api.js";
+import {DEV_USER_ID} from "@/lib/devUser.js";
 
 
 export default function Entries() {
@@ -13,29 +14,44 @@ export default function Entries() {
     const [entries, setEntries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [favoritesOnly, setFavoritesOnly] = useState(false);
 
 
     useEffect(() => {
-        if (!journalId) {
-            setLoading(false);
-            return;
-        }
-
         let cancelled = false;
 
-        async function loadJournalEntries() {
+        async function loadEntries() {
             setLoading(true);
             setError("");
+            setJournal(null);
+            setEntries([]);
 
             try {
-                const [journalData, entriesData] = await Promise.all([
-                    getJournal(journalId),
-                    getEntries(journalId),
-                ]);
+                if (journalId) {
+                    const [journalData, entriesData] = await Promise.all([
+                        getJournal(journalId),
+                        getEntries(journalId),
+                    ]);
 
-                if (!cancelled) {
-                    setJournal(journalData);
-                    setEntries(entriesData);
+                    if (!cancelled) {
+                        setJournal(journalData);
+                        setEntries(entriesData);
+                    }
+                } else {
+                    const journals = await getJournals(DEV_USER_ID);
+
+                    const activeJournals = journals.filter(
+                        (journal) => !journal.is_archived
+                    );
+
+                    const entriesByJournal = await Promise.all(
+                        activeJournals.map(journal => getEntries(journal.id))
+                    );
+
+                    if (!cancelled) {
+                        setEntries(entriesByJournal.flat());
+                    }
                 }
             } catch (error) {
                 if (!cancelled) {
@@ -48,12 +64,24 @@ export default function Entries() {
             }
         }
 
-        void loadJournalEntries();
+        void loadEntries();
 
         return () => {
             cancelled = true;
         };
     }, [journalId]);
+
+    const visibleEntries = entries
+        .filter(entry => {
+            if (statusFilter === "all") return true;
+            return entry.status === statusFilter;
+        })
+        .filter(entry => !favoritesOnly || entry.is_favorite)
+        .sort(
+            (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+        );
 
     return (
         <div>
@@ -64,7 +92,7 @@ export default function Entries() {
                     </p>
 
                     <h2 className="font-serif text-3xl text-ink md:text-4xl">
-                        {journal?.title ?? "Journal Entries"}
+                        {journal?.title ?? "All Entries"}
                     </h2>
 
                     <p className="mt-4 text-muted-foreground">
@@ -85,6 +113,46 @@ export default function Entries() {
                 </Button>
             </header>
 
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+                <div
+                    role="group"
+                    aria-label="Filter entries by status"
+                    className="flex flex-wrap gap-2"
+                >
+                    {[
+                        {value: "all", label: "All"},
+                        {value: "draft", label: "Drafts"},
+                        {value: "published", label: "Published"},
+                    ].map((filter) => (
+                        <Button
+                            key={filter.value}
+                            variant={
+                                statusFilter === filter.value
+                                    ? "default"
+                                    : "outline"
+                            }
+                            size="sm"
+                            onClick={() => setStatusFilter(filter.value)}
+                            aria-pressed={statusFilter === filter.value}
+                        >
+                            {filter.label}
+                        </Button>
+                    ))}
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                    <input
+                        type="checkbox"
+                        checked={favoritesOnly}
+                        onChange={(event) =>
+                            setFavoritesOnly(event.target.checked)
+                        }
+                        className="accent-sage"
+                    />
+                    Favorites only
+                </label>
+            </div>
+
             <section
                 aria-label="Journal entries"
                 className="mt-10 space-y-4"
@@ -101,8 +169,12 @@ export default function Entries() {
                     <p className="text-sm text-[#667266]">
                         No entries yet. Start writing your first entry.
                     </p>
+                ) : visibleEntries.length === 0 ? (
+                    <p className="text-sm text-[#667266]">
+                        No entries match your filters.
+                    </p>
                 ) : (
-                    entries.map((entry) => (
+                    visibleEntries.map((entry) => (
                         <EntryCard
                             key={entry.id}
                             id={entry.id}
