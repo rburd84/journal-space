@@ -16,12 +16,15 @@ export default function Editor() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState(null);
     const [savedEntry, setSavedEntry] = useState(null);
+    const [saveSuccess, setSaveSuccess] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishError, setPublishError] = useState(null);
     const [selectedJournalId, setSelectedJournalId] = useState(journalId ?? "");
     const [availableJournals, setAvailableJournals] = useState([]);
     const [journalsLoading, setJournalsLoading] = useState(false);
     const [journalsError, setJournalsError] = useState("");
+    const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+    const [favoriteError, setFavoriteError] = useState(null);
     const isEditMode = Boolean(entryId);
     const effectiveJournalId = isEditMode
         ? savedEntry?.journal_id
@@ -35,6 +38,7 @@ export default function Editor() {
         async function loadEntry() {
             setIsLoading(true);
             setLoadError(null);
+            setSaveSuccess(false);
 
             try {
                 const response = await fetch(`/api/entries/${entryId}`, {
@@ -114,6 +118,7 @@ export default function Editor() {
 
         setIsSaving(true);
         setSaveError(null);
+        setSaveSuccess(false);
 
         try {
             const isExistingEntry = savedEntry !== null;
@@ -157,6 +162,7 @@ export default function Editor() {
             const entry = await response.json();
 
             setSavedEntry(entry);
+            setSaveSuccess(true);
             console.log("Saved draft:", entry);
         } catch (error) {
             setSaveError(error.message);
@@ -192,6 +198,32 @@ export default function Editor() {
         }
     }
 
+    async function handleToggleFavorite() {
+        if (!savedEntry || isTogglingFavorite) return;
+
+        setIsTogglingFavorite(true);
+        setFavoriteError(null);
+
+        try {
+            const response = await fetch(
+                `/api/entries/${savedEntry.id}/favorite`,
+                {method: "PATCH"}
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to update favorite (HTTP ${response.status})`
+                );
+            }
+
+            const updatedEntry = await response.json();
+            setSavedEntry(updatedEntry);
+        } catch (error) {
+            setFavoriteError(error.message);
+        } finally {
+            setIsTogglingFavorite(false);
+        }
+    }
 
     if (isEditMode && isLoading) {
         return <p className="p-6 text-muted-foreground">Loading entry...</p>;
@@ -209,9 +241,6 @@ export default function Editor() {
         <div className="mx-auto w-full min-w-0 max-w-[760px]">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    {/*<p className="text-sm font-medium text-sage-dark">*/}
-                    {/*    Daily Reflections*/}
-                    {/*</p>*/}
                     {!isEditMode && !journalId ? (
                         <div>
                             <label
@@ -284,7 +313,10 @@ export default function Editor() {
                     id="entry-title"
                     type="text"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                        setTitle(e.target.value);
+                        setSaveSuccess(false);
+                    }}
                     placeholder="Untitled entry"
                     className="block w-full min-w-0 border-0 bg-transparent font-serif text-[clamp(1.75rem,5vw,2.5rem)] leading-tight text-ink outline-none"
                 />
@@ -298,7 +330,10 @@ export default function Editor() {
                 <textarea
                     id="entry-content"
                     value={content}
-                    onChange={(e) => setContent(e.target.value)}
+                    onChange={(e) => {
+                        setContent(e.target.value);
+                        setSaveSuccess(false);
+                    }}
                     placeholder="Begin writing..."
                     rows={12}
                     className="block w-full min-w-0 resize-y border-0 bg-transparent font-serif text-[17px] leading-[1.8] text-ink outline-none md:text-lg"
@@ -306,10 +341,30 @@ export default function Editor() {
             </section>
 
             <footer className="mt-6 flex flex-wrap items-center justify-between gap-4">
-                <Button variant="outline" className="h-auto min-h-11 px-4 py-3">
-                    <Star size={18} aria-hidden="true"/>
-                    Favorite
+                <Button
+                    variant="outline"
+                    className="h-auto min-h-11 px-4 py-3"
+                    onClick={handleToggleFavorite}
+                    disabled={!savedEntry || isTogglingFavorite}
+                    aria-pressed={Boolean(savedEntry?.is_favorite)}
+                >
+                    <Star
+                        size={18}
+                        className={savedEntry?.is_favorite ? "fill-sage text-sage" : ""}
+                        aria-hidden="true"
+                    />
+                    {isTogglingFavorite
+                        ? "Updating..."
+                        : savedEntry?.is_favorite
+                            ? "Favorited"
+                            : "Favorite"}
                 </Button>
+
+                {favoriteError && (
+                    <p role="alert" className="text-sm text-red-700">
+                        {favoriteError}
+                    </p>
+                )}
 
                 <div className="flex flex-wrap gap-3">
                     <Button
@@ -352,7 +407,7 @@ export default function Editor() {
                     </p>
                 )}
 
-                {savedEntry && (
+                {saveSuccess && (
                     <p role="status" className="mt-4 text-sm text-sage-dark">
                         Entry saved successfully.
                     </p>

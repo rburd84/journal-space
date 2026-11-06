@@ -2,62 +2,17 @@ import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Link, useParams} from "react-router";
 import {useEffect, useState} from "react";
+import {getJournal} from "@/lib/api.js";
 
-
-const sampleEntries = [
-    {
-        id: "entry-1",
-        title: "Finding calm in the everyday",
-        date: "October 30, 2026",
-        status: "Published",
-        isFavorite: true,
-        content: [
-            "Today I found a little space to slow down and reflect.",
-            "There was something comforting about the quiet. Nothing needed to be accomplished, and there was nowhere else I needed to be.",
-            "Sometimes the smallest moments are the ones worth remembering.",
-        ],
-    },
-    {
-        id: "entry-2",
-        title: "A few thoughts from this morning",
-        date: "October 28, 2026",
-        status: "Draft",
-        isFavorite: false,
-        content: [
-            "The morning started slowly, with a warm cup of tea and a few moments of silence.",
-            "I want to make more room for mornings like this.",
-        ],
-    },
-    {
-        id: "entry-3",
-        title: "The little things that matter",
-        date: "October 25, 2026",
-        status: "Published",
-        isFavorite: false,
-        content: [
-            "Today reminded me that meaningful moments don't have to be extraordinary.",
-            "A kind word, a familiar smile, and a little time outdoors were enough.",
-        ],
-    },
-    {
-        id: "entry-4",
-        title: "An unfinished thought",
-        date: "October 22, 2026",
-        status: "Draft",
-        isFavorite: true,
-        content: [
-            "There is something I've been meaning to write about, but I haven't quite found the words yet.",
-        ],
-    },
-];
 
 export default function Reader() {
     const {entryId} = useParams();
-
-
     const [entry, setEntry] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [journalTitle, setJournalTitle] = useState("");
+    const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+    const [favoriteError, setFavoriteError] = useState(null);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -101,6 +56,57 @@ export default function Reader() {
         return () => controller.abort();
     }, [entryId]);
 
+    useEffect(() => {
+        if (!entry?.journal_id) return;
+
+        let cancelled = false;
+
+        async function loadJournal() {
+            try {
+                const journal = await getJournal(entry.journal_id);
+
+                if (!cancelled) {
+                    setJournalTitle(journal.title);
+                }
+            } catch (error) {
+                console.error("Unable to load journal:", error);
+            }
+        }
+
+        void loadJournal();
+
+        return () =>
+            cancelled = true;
+    }, [entry?.journal_id]);
+
+    async function handleToggleFavorite() {
+        if (!entry || isTogglingFavorite) return;
+
+        setIsTogglingFavorite(true);
+        setFavoriteError(null);
+
+        try {
+            const response = await fetch(
+                `/api/entries/${entry.id}/favorite`,
+                {method: "PATCH"}
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to update favorite (HTTP ${response.status})`
+                );
+            }
+
+            const updatedEntry = await response.json();
+
+            setEntry(updatedEntry);
+        } catch (error) {
+            setFavoriteError(error.message);
+        } finally {
+            setIsTogglingFavorite(false);
+        }
+    }
+
     if (isLoading) {
         return (
             <p className="p-6 text-muted-foreground">
@@ -111,8 +117,8 @@ export default function Reader() {
 
     if (!entry) {
         return (
-            <p className="text-muted-foreground">
-                Entry not found.
+            <p role="alert" className="text-red-700">
+                {error || "Entry not found."}
             </p>
         );
     }
@@ -122,21 +128,25 @@ export default function Reader() {
             <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <p className="text-sm font-medium text-sage-dark">
-                        Daily Reflections
+                        {journalTitle || "Journal Entry"}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        {entry.date}
+                        {new Date(entry.created_at).toLocaleDateString("en-US", {
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                        })}
                     </p>
                 </div>
 
                 <span
                     className={`rounded-full px-3 py-1 text-xs font-medium ${
-                        entry.status === "Published"
+                        entry.status === "published"
                             ? "bg-sidebar-selected text-sage-dark"
                             : "bg-secondary text-muted-foreground"
                     }`}
                 >
-                    {entry.status}
+                    {entry.status === "published" ? "Published" : "Draft"}
                 </span>
             </header>
 
@@ -157,14 +167,26 @@ export default function Reader() {
                 <Button
                     variant="outline"
                     className="h-auto min-h-11 px-4 py-3"
+                    onClick={handleToggleFavorite}
+                    disabled={isTogglingFavorite}
+                    aria-pressed={Boolean(entry.is_favorite)}
                 >
                     <Star
                         size={18}
-                        className={entry.isFavorite ? "fill-sage text-sage" : ""}
+                        className={entry.is_favorite ? "fill-sage text-sage" : ""}
                         aria-hidden="true"
                     />
-                    {entry.isFavorite ? "Favorited" : "Favorite"}
+                    {isTogglingFavorite
+                        ? "Updating..."
+                        : entry.is_favorite ? "Favorited" : "Favorite"
+                    }
                 </Button>
+
+                {favoriteError && (
+                    <p role="alert" className="text-sm text-red-700">
+                        {favoriteError}
+                    </p>
+                )}
 
                 <Button
                     nativeButton={false}

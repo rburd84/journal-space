@@ -55,6 +55,20 @@ class EntryService:
         self.repository.save(entry)
         return entry
 
+    def toggle_favorite(
+            self,
+            entry_id: UUID,
+    ) -> JournalEntry:
+        entry = self.repository.get(entry_id)
+
+        if entry is None:
+            raise EntryNotFoundError(entry_id)
+
+        entry.toggle_favorite()
+        self.repository.save(entry)
+
+        return entry
+
     def list_entries_by_journal(
             self,
             journal_id: UUID,

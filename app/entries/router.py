@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .schemas import (
     EntryCreate, EntryResponse, EntryUpdate)
-from .service import EntryService
+from .service import EntryService, EntryNotFoundError
 from .sql_repository import SqlEntryRepository
 from ..core.dependencies import get_db
 
@@ -122,3 +122,29 @@ def update_entry(
     )
     db.commit()
     return updated_entry
+
+
+@router.patch(
+    "/{entry_id}/favorite",
+    response_model=EntryResponse,
+)
+def toggle_entry_favorite(
+        entry_id: UUID,
+        db: Session = Depends(get_db),
+):
+    # Development only:
+    # Authenticate and verify journal ownership
+    # before enabling this endpoint in production.
+    repository = SqlEntryRepository(db)
+    service = EntryService(repository)
+
+    try:
+        entry = service.toggle_favorite(entry_id)
+    except EntryNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Entry not found",
+        )
+
+    db.commit()
+    return entry
