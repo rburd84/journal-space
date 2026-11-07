@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {archiveJournal, getJournals, restoreJournal} from "@/lib/api.js";
+import {archiveJournal, getJournals, renameJournal, restoreJournal} from "@/lib/api.js";
 import {DEV_USER_ID} from "@/lib/devUser.js";
 import CreateJournalDialog from "@/components/CreateJournalDialog.jsx";
 import ManageJournalCard from "@/components/ManageJournalCard.jsx";
