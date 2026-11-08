@@ -125,6 +125,7 @@ def archive_journal(
     db.commit()
     return journal
 
+
 @router.patch(
     "/{journal_id}/restore",
     response_model=JournalResponse,
@@ -145,16 +146,3 @@ def restore_journal(
 
     db.commit()
     return journal
-
-
-
-
-
-
-
-
-
-
-
-
-
