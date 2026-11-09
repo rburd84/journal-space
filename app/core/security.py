@@ -1,7 +1,7 @@
 import jwt
 from fastapi import HTTPException
 
-from app.core.config import get_clerk_jwks_url, get_clerk_issuer
+from app.core.config import get_clerk_jwks_url, get_clerk_issuer, get_clerk_authorized_parties
 
 
 def get_clerk_signing_key(token: str):
@@ -22,6 +22,11 @@ def verify_clerk_token(token: str) -> dict:
                 "require": ["exp", "iat", "sub", "iss"],
             },
         )
+
+        authorized_parties = get_clerk_authorized_parties()
+
+        if claims.get("azp") not in authorized_parties:
+            raise jwt.InvalidTokenError("Unauthorized party")
 
         if not claims.get("sub"):
             raise jwt.InvalidTokenError("Missing subject")
