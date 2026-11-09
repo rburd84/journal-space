@@ -19,12 +19,23 @@ def get_clerk_jwks_url() -> str:
 
 def get_clerk_authorized_parties() -> list[str]:
     value = os.getenv("CLERK_AUTHORIZED_PARTIES", "")
-    parties = [party.strip().rstrip("/") for party in value.split(",") if party.strip()]
+
+    parties = [
+        party.strip().rstrip("/")
+        for party in value.split(",")
+        if party.strip()
+    ]
 
     if not parties:
-        raise RuntimeError("CLERK_AUTHORIZED_PARTIES is not configured")
+        raise RuntimeError(
+            "CLERK_AUTHORIZED_PARTIES is not configured"
+        )
 
-    if any(not party.startswith(("https://", "http://localhost:", "http://127.0.0.1:")) for party in parties):
+    if any(
+            not party.startswith(
+                ("https://", "http://localhost:", "http://127.0.0.1:")
+            ) for party in parties
+    ):
         raise RuntimeError("Invalid Clerk authorized party")
 
     return parties

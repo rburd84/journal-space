@@ -1,7 +1,11 @@
 import jwt
 from fastapi import HTTPException
 
-from app.core.config import get_clerk_jwks_url, get_clerk_issuer, get_clerk_authorized_parties
+from app.core.config import (
+    get_clerk_jwks_url,
+    get_clerk_issuer,
+    get_clerk_authorized_parties,
+)
 
 
 def get_clerk_signing_key(token: str):

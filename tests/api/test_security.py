@@ -23,6 +23,8 @@ def test_valid_rs256_token_is_accepted():
             "iss": "https://example.com",
             "iat": now,
             "exp": now + timedelta(minutes=5),
+            "azp": "http://localhost:5173",
+
         },
         private_key,
         algorithm="RS256",
@@ -36,6 +38,10 @@ def test_valid_rs256_token_is_accepted():
         patch(
             "app.core.security.get_clerk_issuer",
             return_value="https://example.com",
+        ),
+        patch(
+            "app.core.security.get_clerk_authorized_parties",
+            return_value=["http://localhost:5173"],
         ),
     ):
         claims = verify_clerk_token(token)
@@ -203,6 +209,7 @@ def test_empty_subject_is_rejected():
             "iss": "https://example.com",
             "iat": now,
             "exp": now + timedelta(minutes=5),
+            "azp": "http://localhost:5173",
         },
         private_key,
         algorithm="RS256",
@@ -216,6 +223,10 @@ def test_empty_subject_is_rejected():
         patch(
             "app.core.security.get_clerk_issuer",
             return_value="https://example.com",
+        ),
+        patch(
+            "app.core.security.get_clerk_issuer",
+            return_value="http://localhost:5173",
         ),
     ):
         with pytest.raises(HTTPException) as exc_info:
@@ -315,3 +326,56 @@ def test_signing_key_lookup_failures(failure, expected_status):
         )
     else:
         assert exc_info.value.detail == "Invalid authentication token"
+
+
+@pytest.mark.parametrize(
+    "authorized_party",
+    [
+        "http://localhost:9999",
+        "https://untrusted.example.com",
+        None,
+    ],
+)
+def test_unauthorized_party_is_rejected(authorized_party):
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    claims = {
+        "sub": "user_test123",
+        "iss": "https://example.com",
+        "iat": now,
+        "exp": now + timedelta(minutes=5),
+    }
+
+    if authorized_party is not None:
+        claims["azp"] = authorized_party
+
+    token = jwt.encode(
+        claims,
+        private_key,
+        algorithm="RS256",
+    )
+
+    with (
+        patch(
+            "app.core.security.get_clerk_signing_key",
+            return_value=private_key.public_key(),
+        ),
+        patch(
+            "app.core.security.get_clerk_issuer",
+            return_value="https://example.com",
+        ),
+        patch(
+            "app.core.security.get_clerk_authorized_parties",
+            return_value=["http://localhost:5173"],
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            verify_clerk_token(token)
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Invalid authentication token"
