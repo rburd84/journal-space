@@ -3,11 +3,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .schemas import (
-    EntryCreate, EntryResponse, EntryUpdate)
+from app.core.dependencies import get_current_user, get_db
+from app.core.ownership import (
+    require_owned_entry,
+    require_owned_journal,
+)
+from app.users.models import UserModel
+from .schemas import EntryCreate, EntryResponse, EntryUpdate
 from .service import EntryService, EntryNotFoundError
 from .sql_repository import SqlEntryRepository
-from ..core.dependencies import get_db
 
 router = APIRouter(
     prefix="/entries",
@@ -15,16 +19,23 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=EntryResponse, status_code=201, )
+@router.post(
+    "/",
+    response_model=EntryResponse,
+    status_code=201,
+)
 def create_entry(
         data: EntryCreate,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    # Development example only:
-    # Authenticate and verify journal ownership
-    # before allowing this operation.
-    repository = SqlEntryRepository(db)
-    service = EntryService(repository)
+    require_owned_journal(
+        db,
+        data.journal_id,
+        current_user.id,
+    )
+
+    service = EntryService(SqlEntryRepository(db))
 
     entry = service.create_entry(
         journal_id=data.journal_id,
@@ -36,27 +47,42 @@ def create_entry(
     return entry
 
 
-@router.get("/", response_model=list[EntryResponse])
+@router.get(
+    "/",
+    response_model=list[EntryResponse],
+)
 def list_entries(
         journal_id: UUID,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    # Development only:
-    # Verify the requesting user's ownership of this journal
-    # before exposing entries in production.
-    repository = SqlEntryRepository(db)
-    service = EntryService(repository)
+    require_owned_journal(
+        db,
+        journal_id,
+        current_user.id,
+    )
+
+    service = EntryService(SqlEntryRepository(db))
 
     return service.list_entries_by_journal(journal_id)
 
 
-@router.get("/{entry_id}", response_model=EntryResponse)
+@router.get(
+    "/{entry_id}",
+    response_model=EntryResponse,
+)
 def get_entry(
         entry_id: UUID,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    repository = SqlEntryRepository(db)
+    require_owned_entry(
+        db,
+        entry_id,
+        current_user.id,
+    )
 
+    repository = SqlEntryRepository(db)
     entry = repository.get(entry_id)
 
     if entry is None:
@@ -75,53 +101,60 @@ def get_entry(
 def publish_entry(
         entry_id: UUID,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    # Development only:
-    # Authenticate the user and verify journal ownership
-    # before allowing publication in production.
-    repository = SqlEntryRepository(db)
-    service = EntryService(repository)
+    require_owned_entry(
+        db,
+        entry_id,
+        current_user.id,
+    )
 
-    entry = repository.get(entry_id)
+    service = EntryService(SqlEntryRepository(db))
 
-    if entry is None:
+    try:
+        entry = service.publish_entry(entry_id)
+    except EntryNotFoundError:
         raise HTTPException(
             status_code=404,
             detail="Entry not found",
         )
 
-    published_entry = service.publish_entry(entry_id)
-
     db.commit()
-    return published_entry
+    return entry
 
 
-@router.patch("/{entry_id}", response_model=EntryResponse)
+@router.patch(
+    "/{entry_id}",
+    response_model=EntryResponse,
+)
 def update_entry(
         entry_id: UUID,
         data: EntryUpdate,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    # Development only:
-    # Authenticate and verify journal ownership
-    # before allowing updates in production.
-    repository = SqlEntryRepository(db)
-    service = EntryService(repository)
+    require_owned_entry(
+        db,
+        entry_id,
+        current_user.id,
+    )
 
-    entry = repository.get(entry_id)
-    if entry is None:
+    service = EntryService(SqlEntryRepository(db))
+
+    try:
+        entry = service.update_entry(
+            entry_id=entry_id,
+            title=data.title,
+            content=data.content,
+        )
+    except EntryNotFoundError:
         raise HTTPException(
             status_code=404,
             detail="Entry not found",
         )
 
-    updated_entry = service.update_entry(
-        entry_id=entry_id,
-        title=data.title,
-        content=data.content,
-    )
     db.commit()
-    return updated_entry
+    return entry
 
 
 @router.patch(
@@ -131,12 +164,15 @@ def update_entry(
 def toggle_entry_favorite(
         entry_id: UUID,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    # Development only:
-    # Authenticate and verify journal ownership
-    # before enabling this endpoint in production.
-    repository = SqlEntryRepository(db)
-    service = EntryService(repository)
+    require_owned_entry(
+        db,
+        entry_id,
+        current_user.id,
+    )
+
+    service = EntryService(SqlEntryRepository(db))
 
     try:
         entry = service.toggle_favorite(entry_id)
@@ -150,16 +186,22 @@ def toggle_entry_favorite(
     return entry
 
 
-@router.delete("/{entry_id}", status_code=204)
+@router.delete(
+    "/{entry_id}",
+    status_code=204,
+)
 def delete_entry(
         entry_id: UUID,
         db: Session = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ):
-    # Development only:
-    # Authenticate and verify journal ownership
-    # before enabling this endpoint in production.
-    repository = SqlEntryRepository(db)
-    service = EntryService(repository)
+    require_owned_entry(
+        db,
+        entry_id,
+        current_user.id,
+    )
+
+    service = EntryService(SqlEntryRepository(db))
 
     try:
         service.delete_entry(entry_id)

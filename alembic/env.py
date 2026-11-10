@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 import app.entries.models  # noqa: F401
 import app.journals.models  # noqa: F401
+import app.users.invitations  # noqa: F401
 import app.users.models  # noqa: F401
 from app.core.database import Base
 

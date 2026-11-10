@@ -1,10 +1,11 @@
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_current_user, get_db
 from app.journals import router as journal_router_module
 from app.journals.domain import Journal
 
@@ -20,7 +21,11 @@ class FakeJournalRepository:
         return self.journals.get(journal_id)
 
     def list_by_user(self, user_id):
-        return [j for j in self.journals.values() if j.user_id == user_id]
+        return [
+            journal
+            for journal in self.journals.values()
+            if journal.user_id == user_id
+        ]
 
 
 class FakeSession:
@@ -35,23 +40,59 @@ class FakeSession:
 def api(monkeypatch):
     repository = FakeJournalRepository()
     session = FakeSession()
-    # The router constructs a repository per request; return our isolated fake.
-    monkeypatch.setattr(journal_router_module, "SqlJournalRepository", lambda db: repository)
+    user = SimpleNamespace(id=uuid4(), is_active=True)
+
+    monkeypatch.setattr(
+        journal_router_module,
+        "SqlJournalRepository",
+        lambda db: repository,
+    )
+
+    def fake_require_owned_journal(db, journal_id, user_id):
+        journal = repository.get(journal_id)
+
+        if journal is None or journal.user_id != user_id:
+            raise HTTPException(
+                status_code=404,
+                detail="Journal not found",
+            )
+
+        return journal
+
+    monkeypatch.setattr(
+        journal_router_module,
+        "require_owned_journal",
+        fake_require_owned_journal,
+    )
+
     app = FastAPI()
     app.include_router(journal_router_module.router)
+
     app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_current_user] = lambda: user
+
     with TestClient(app) as client:
-        yield client, repository, session
+        yield client, repository, session, user
+
     app.dependency_overrides.clear()
 
 
 def test_create_journal_returns_201_and_default_type(api):
-    client, repo, session = api
-    user_id = uuid4()
-    response = client.post("/journals/", json={"user_id": str(user_id), "title": "  Notes  "})
+    client, repo, session, user = api
+
+    response = client.post(
+        "/journals/",
+        json={
+            "user_id": str(user.id),
+            "title": "  Notes  ",
+        },
+    )
+
     assert response.status_code == 201
+
     body = response.json()
-    assert body["user_id"] == str(user_id)
+
+    assert body["user_id"] == str(user.id)
     assert body["title"] == "Notes"
     assert body["type"] == "personal"
     assert body["is_archived"] is False
@@ -60,78 +101,199 @@ def test_create_journal_returns_201_and_default_type(api):
 
 
 def test_create_journal_accepts_explicit_type(api):
-    client, _, _ = api
-    response = client.post("/journals/", json={"user_id": str(uuid4()), "title": "Thanks", "type": "gratitude"})
+    client, _, _, user = api
+
+    response = client.post(
+        "/journals/",
+        json={
+            "user_id": str(user.id),
+            "title": "Thanks",
+            "type": "gratitude",
+        },
+    )
+
     assert response.status_code == 201
     assert response.json()["type"] == "gratitude"
 
 
 @pytest.mark.parametrize("title", ["", "   ", "\n\t"])
 def test_create_journal_rejects_blank_title(api, title):
-    client, repo, session = api
-    response = client.post("/journals/", json={"user_id": str(uuid4()), "title": title})
+    client, repo, session, user = api
+
+    response = client.post(
+        "/journals/",
+        json={
+            "user_id": str(user.id),
+            "title": title,
+        },
+    )
+
     assert response.status_code == 422
     assert repo.journals == {}
     assert session.commits == 0
 
 
 def test_create_journal_rejects_invalid_type(api):
-    client, _, session = api
-    response = client.post("/journals/", json={"user_id": str(uuid4()), "title": "Notes", "type": "unknown"})
+    client, _, session, user = api
+
+    response = client.post(
+        "/journals/",
+        json={
+            "user_id": str(user.id),
+            "title": "Notes",
+            "type": "unknown",
+        },
+    )
+
     assert response.status_code == 422
     assert session.commits == 0
 
 
 def test_create_journal_rejects_missing_user_id(api):
-    client, _, _ = api
-    assert client.post("/journals/", json={"title": "Notes"}).status_code == 422
+    client, _, _, _ = api
+
+    response = client.post(
+        "/journals/",
+        json={"title": "Notes"},
+    )
+
+    assert response.status_code == 422
 
 
-def test_list_journals_filters_by_user_and_includes_archived(api):
-    client, repo, _ = api
-    user_id = uuid4()
-    own = Journal(user_id=user_id, title="Own")
-    archived = Journal(user_id=user_id, title="Archived", is_archived=True)
-    other = Journal(user_id=uuid4(), title="Other")
+def test_create_journal_rejects_another_user_id(api):
+    client, repo, session, _ = api
+
+    response = client.post(
+        "/journals/",
+        json={
+            "user_id": str(uuid4()),
+            "title": "Not Mine",
+        },
+    )
+
+    assert response.status_code == 403
+    assert repo.journals == {}
+    assert session.commits == 0
+
+
+def test_list_journals_filters_by_authenticated_user(api):
+    client, repo, _, user = api
+
+    own = Journal(
+        user_id=user.id,
+        title="Own",
+    )
+
+    archived = Journal(
+        user_id=user.id,
+        title="Archived",
+        is_archived=True,
+    )
+
+    other = Journal(
+        user_id=uuid4(),
+        title="Other",
+    )
+
     for journal in (own, archived, other):
         repo.save(journal)
-    response = client.get("/journals/", params={"user_id": str(user_id)})
+
+    response = client.get("/journals/")
+
     assert response.status_code == 200
-    assert {j["id"] for j in response.json()} == {str(own.id), str(archived.id)}
+
+    returned_ids = {
+        journal["id"]
+        for journal in response.json()
+    }
+
+    assert returned_ids == {
+        str(own.id),
+        str(archived.id),
+    }
 
 
-def test_list_journals_requires_user_id(api):
-    client, _, _ = api
-    assert client.get("/journals/").status_code == 422
+def test_list_journals_does_not_require_user_id(api):
+    client, _, _, _ = api
+
+    response = client.get("/journals/")
+
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_get_existing_journal(api):
-    client, repo, _ = api
-    journal = Journal(user_id=uuid4(), title="Notes")
+    client, repo, _, user = api
+
+    journal = Journal(
+        user_id=user.id,
+        title="Notes",
+    )
+
     repo.save(journal)
-    response = client.get(f"/journals/{journal.id}")
+
+    response = client.get(
+        f"/journals/{journal.id}"
+    )
+
     assert response.status_code == 200
     assert response.json()["id"] == str(journal.id)
     assert response.json()["title"] == "Notes"
 
 
 def test_get_missing_journal_returns_404(api):
-    client, _, _ = api
-    response = client.get(f"/journals/{uuid4()}")
+    client, _, _, _ = api
+
+    response = client.get(
+        f"/journals/{uuid4()}"
+    )
+
     assert response.status_code == 404
     assert response.json()["detail"] == "Journal not found"
 
 
+def test_get_other_users_journal_returns_404(api):
+    client, repo, _, _ = api
+
+    journal = Journal(
+        user_id=uuid4(),
+        title="Private",
+    )
+
+    repo.save(journal)
+
+    response = client.get(
+        f"/journals/{journal.id}"
+    )
+
+    assert response.status_code == 404
+
+
 def test_get_malformed_journal_id_returns_422(api):
-    client, _, _ = api
-    assert client.get("/journals/not-a-uuid").status_code == 422
+    client, _, _, _ = api
+
+    response = client.get(
+        "/journals/not-a-uuid"
+    )
+
+    assert response.status_code == 422
 
 
 def test_rename_existing_journal(api):
-    client, repo, session = api
-    journal = Journal(user_id=uuid4(), title="Old")
+    client, repo, session, user = api
+
+    journal = Journal(
+        user_id=user.id,
+        title="Old",
+    )
+
     repo.save(journal)
-    response = client.patch(f"/journals/{journal.id}/rename", json={"title": "  New  "})
+
+    response = client.patch(
+        f"/journals/{journal.id}/rename",
+        json={"title": "  New  "},
+    )
+
     assert response.status_code == 200
     assert response.json()["title"] == "New"
     assert repo.get(journal.id).title == "New"
@@ -139,27 +301,52 @@ def test_rename_existing_journal(api):
 
 
 def test_rename_missing_journal_returns_404(api):
-    client, _, session = api
-    assert client.patch(f"/journals/{uuid4()}/rename", json={"title": "New"}).status_code == 404
+    client, _, session, _ = api
+
+    response = client.patch(
+        f"/journals/{uuid4()}/rename",
+        json={"title": "New"},
+    )
+
+    assert response.status_code == 404
     assert session.commits == 0
 
 
-@pytest.mark.parametrize("title", ["", " " * 3])
+@pytest.mark.parametrize("title", ["", "   "])
 def test_rename_rejects_blank_title(api, title):
-    client, repo, session = api
-    journal = Journal(user_id=uuid4(), title="Original")
+    client, repo, session, user = api
+
+    journal = Journal(
+        user_id=user.id,
+        title="Original",
+    )
+
     repo.save(journal)
-    response = client.patch(f"/journals/{journal.id}/rename", json={"title": title})
+
+    response = client.patch(
+        f"/journals/{journal.id}/rename",
+        json={"title": title},
+    )
+
     assert response.status_code == 422
     assert repo.get(journal.id).title == "Original"
     assert session.commits == 0
 
 
 def test_archive_existing_journal(api):
-    client, repo, session = api
-    journal = Journal(user_id=uuid4(), title="Notes")
+    client, repo, session, user = api
+
+    journal = Journal(
+        user_id=user.id,
+        title="Notes",
+    )
+
     repo.save(journal)
-    response = client.patch(f"/journals/{journal.id}/archive")
+
+    response = client.patch(
+        f"/journals/{journal.id}/archive"
+    )
+
     assert response.status_code == 200
     assert response.json()["is_archived"] is True
     assert repo.get(journal.id).is_archived is True
@@ -167,16 +354,31 @@ def test_archive_existing_journal(api):
 
 
 def test_archive_missing_journal_returns_404(api):
-    client, _, session = api
-    assert client.patch(f"/journals/{uuid4()}/archive").status_code == 404
+    client, _, session, _ = api
+
+    response = client.patch(
+        f"/journals/{uuid4()}/archive"
+    )
+
+    assert response.status_code == 404
     assert session.commits == 0
 
 
 def test_restore_existing_journal(api):
-    client, repo, session = api
-    journal = Journal(user_id=uuid4(), title="Notes", is_archived=True)
+    client, repo, session, user = api
+
+    journal = Journal(
+        user_id=user.id,
+        title="Notes",
+        is_archived=True,
+    )
+
     repo.save(journal)
-    response = client.patch(f"/journals/{journal.id}/restore")
+
+    response = client.patch(
+        f"/journals/{journal.id}/restore"
+    )
+
     assert response.status_code == 200
     assert response.json()["is_archived"] is False
     assert repo.get(journal.id).is_archived is False
@@ -184,6 +386,11 @@ def test_restore_existing_journal(api):
 
 
 def test_restore_missing_journal_returns_404(api):
-    client, _, session = api
-    assert client.patch(f"/journals/{uuid4()}/restore").status_code == 404
+    client, _, session, _ = api
+
+    response = client.patch(
+        f"/journals/{uuid4()}/restore"
+    )
+
+    assert response.status_code == 404
     assert session.commits == 0

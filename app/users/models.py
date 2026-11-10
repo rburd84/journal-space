@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 
-from sqlalchemy import String
+from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -19,4 +19,11 @@ class UserModel(Base):
         unique=True,
         index=True,
         nullable=False,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
     )

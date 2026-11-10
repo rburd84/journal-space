@@ -1,10 +1,11 @@
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_current_user, get_db
 from app.entries import router as entry_router_module
 from app.entries.domain import JournalEntry, EntryStatus
 
@@ -23,8 +24,11 @@ class FakeEntryRepository:
         return self.entries.pop(entry_id, None) is not None
 
     def list_by_journal(self, journal_id):
-        return [entry for entry in self.entries.values()
-                if entry.journal_id == journal_id]
+        return [
+            entry
+            for entry in self.entries.values()
+            if entry.journal_id == journal_id
+        ]
 
 
 class FakeSession:
@@ -39,114 +43,318 @@ class FakeSession:
 def api(monkeypatch):
     repository = FakeEntryRepository()
     session = FakeSession()
-    monkeypatch.setattr(entry_router_module, "SqlEntryRepository", lambda db: repository)
+    user = SimpleNamespace(id=uuid4(), is_active=True)
+
+    owned_journals = set()
+
+    monkeypatch.setattr(
+        entry_router_module,
+        "SqlEntryRepository",
+        lambda db: repository,
+    )
+
+    def fake_require_owned_journal(db, journal_id, user_id):
+        if (
+                user_id != user.id
+                or journal_id not in owned_journals
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail="Journal not found",
+            )
+
+        return SimpleNamespace(
+            id=journal_id,
+            user_id=user_id,
+        )
+
+    def fake_require_owned_entry(db, entry_id, user_id):
+        entry = repository.get(entry_id)
+
+        if (
+                user_id != user.id
+                or entry is None
+                or entry.journal_id not in owned_journals
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail="Entry not found",
+            )
+
+        return entry
+
+    monkeypatch.setattr(
+        entry_router_module,
+        "require_owned_journal",
+        fake_require_owned_journal,
+    )
+
+    monkeypatch.setattr(
+        entry_router_module,
+        "require_owned_entry",
+        fake_require_owned_entry,
+    )
+
     app = FastAPI()
     app.include_router(entry_router_module.router)
+
     app.dependency_overrides[get_db] = lambda: session
+    app.dependency_overrides[get_current_user] = lambda: user
+
     with TestClient(app) as client:
-        yield client, repository, session
+        yield client, repository, session, owned_journals
+
     app.dependency_overrides.clear()
 
 
-def seeded(repo, journal_id=None, title="Morning", content="Hello"):
-    entry = JournalEntry(journal_id=journal_id or uuid4(), title=title, content=content)
+def seeded(
+        repo,
+        owned_journals,
+        journal_id=None,
+        title="Morning",
+        content="Hello",
+):
+    journal_id = journal_id or uuid4()
+    owned_journals.add(journal_id)
+
+    entry = JournalEntry(
+        journal_id=journal_id,
+        title=title,
+        content=content,
+    )
+
     repo.save(entry)
     return entry
 
 
 def test_create_returns_201_and_draft_defaults(api):
-    client, repo, session = api
+    client, repo, session, owned_journals = api
+
     journal_id = uuid4()
-    response = client.post("/entries/", json={
-        "journal_id": str(journal_id), "title": "Morning", "content": "Hello"
-    })
+    owned_journals.add(journal_id)
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": str(journal_id),
+            "title": "Morning",
+            "content": "Hello",
+        },
+    )
+
     assert response.status_code == 201
+
     body = response.json()
+
     assert body["journal_id"] == str(journal_id)
     assert body["title"] == "Morning"
     assert body["content"] == "Hello"
     assert body["status"] == "draft"
     assert body["is_favorite"] is False
     assert UUID(body["id"]) in repo.entries
-    assert body["created_at"] and body["updated_at"]
+    assert body["created_at"]
+    assert body["updated_at"]
     assert session.commits == 1
 
 
 def test_create_defaults_content_to_empty(api):
-    client, _, _ = api
-    response = client.post("/entries/", json={"journal_id": str(uuid4()), "title": "Draft"})
+    client, _, _, owned_journals = api
+
+    journal_id = uuid4()
+    owned_journals.add(journal_id)
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": str(journal_id),
+            "title": "Draft",
+        },
+    )
+
     assert response.status_code == 201
     assert response.json()["content"] == ""
 
 
 @pytest.mark.parametrize("title", ["", "x" * 201])
 def test_create_rejects_invalid_title_length(api, title):
-    client, repo, session = api
-    response = client.post("/entries/", json={
-        "journal_id": str(uuid4()), "title": title
-    })
+    client, repo, session, owned_journals = api
+
+    journal_id = uuid4()
+    owned_journals.add(journal_id)
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": str(journal_id),
+            "title": title,
+        },
+    )
+
     assert response.status_code == 422
     assert repo.entries == {}
     assert session.commits == 0
 
 
 def test_create_rejects_invalid_journal_id(api):
-    client, repo, _ = api
-    response = client.post("/entries/", json={"journal_id": "bad-id", "title": "Draft"})
+    client, repo, _, _ = api
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": "bad-id",
+            "title": "Draft",
+        },
+    )
+
     assert response.status_code == 422
     assert not repo.entries
 
 
 def test_create_requires_title(api):
-    client, _, _ = api
-    response = client.post("/entries/", json={"journal_id": str(uuid4())})
+    client, _, _, _ = api
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": str(uuid4()),
+        },
+    )
+
     assert response.status_code == 422
 
 
+def test_create_rejects_unowned_journal(api):
+    client, repo, session, _ = api
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": str(uuid4()),
+            "title": "Unauthorized",
+            "content": "Not allowed",
+        },
+    )
+
+    assert response.status_code == 404
+    assert repo.entries == {}
+    assert session.commits == 0
+
+
 def test_list_entries_filters_by_journal(api):
-    client, repo, _ = api
+    client, repo, _, owned_journals = api
+
     target = uuid4()
-    included = seeded(repo, journal_id=target)
-    seeded(repo, journal_id=uuid4())
-    response = client.get("/entries/", params={"journal_id": str(target)})
+
+    included = seeded(
+        repo,
+        owned_journals,
+        journal_id=target,
+    )
+
+    seeded(
+        repo,
+        owned_journals,
+        journal_id=uuid4(),
+    )
+
+    response = client.get(
+        "/entries/",
+        params={"journal_id": str(target)},
+    )
+
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()] == [str(included.id)]
+    assert [
+               item["id"]
+               for item in response.json()
+           ] == [str(included.id)]
 
 
 def test_list_entries_empty_journal(api):
-    client, _, _ = api
-    response = client.get("/entries/", params={"journal_id": str(uuid4())})
+    client, _, _, owned_journals = api
+
+    journal_id = uuid4()
+    owned_journals.add(journal_id)
+
+    response = client.get(
+        "/entries/",
+        params={"journal_id": str(journal_id)},
+    )
+
     assert response.status_code == 200
     assert response.json() == []
 
 
 def test_list_requires_valid_journal_id(api):
-    client, _, _ = api
-    assert client.get("/entries/").status_code == 422
-    assert client.get("/entries/", params={"journal_id": "invalid"}).status_code == 422
+    client, _, _, _ = api
+
+    assert client.get(
+        "/entries/"
+    ).status_code == 422
+
+    assert client.get(
+        "/entries/",
+        params={"journal_id": "invalid"},
+    ).status_code == 422
+
+
+def test_list_rejects_unowned_journal(api):
+    client, _, _, _ = api
+
+    response = client.get(
+        "/entries/",
+        params={"journal_id": str(uuid4())},
+    )
+
+    assert response.status_code == 404
 
 
 def test_get_existing_entry(api):
-    client, repo, _ = api
-    entry = seeded(repo)
-    response = client.get(f"/entries/{entry.id}")
+    client, repo, _, owned_journals = api
+
+    entry = seeded(repo, owned_journals)
+
+    response = client.get(
+        f"/entries/{entry.id}"
+    )
+
     assert response.status_code == 200
     assert response.json()["id"] == str(entry.id)
 
 
 def test_get_missing_entry_returns_404(api):
-    client, _, _ = api
-    response = client.get(f"/entries/{uuid4()}")
+    client, _, _, _ = api
+
+    response = client.get(
+        f"/entries/{uuid4()}"
+    )
+
     assert response.status_code == 404
     assert response.json()["detail"] == "Entry not found"
 
 
+def test_get_malformed_entry_id_returns_422(api):
+    client, _, _, _ = api
+
+    response = client.get(
+        "/entries/not-a-uuid"
+    )
+
+    assert response.status_code == 422
+
+
 def test_update_changes_title_and_content(api):
-    client, repo, session = api
-    entry = seeded(repo)
-    response = client.patch(f"/entries/{entry.id}", json={
-        "title": "Evening", "content": "Updated"
-    })
+    client, repo, session, owned_journals = api
+
+    entry = seeded(repo, owned_journals)
+
+    response = client.patch(
+        f"/entries/{entry.id}",
+        json={
+            "title": "Evening",
+            "content": "Updated",
+        },
+    )
+
     assert response.status_code == 200
     assert response.json()["title"] == "Evening"
     assert response.json()["content"] == "Updated"
@@ -155,27 +363,44 @@ def test_update_changes_title_and_content(api):
 
 
 def test_update_missing_entry_returns_404_without_commit(api):
-    client, _, session = api
-    response = client.patch(f"/entries/{uuid4()}", json={
-        "title": "Evening", "content": "Updated"
-    })
+    client, _, session, _ = api
+
+    response = client.patch(
+        f"/entries/{uuid4()}",
+        json={
+            "title": "Evening",
+            "content": "Updated",
+        },
+    )
+
     assert response.status_code == 404
     assert session.commits == 0
 
 
 def test_update_requires_both_fields(api):
-    client, repo, session = api
-    entry = seeded(repo)
-    response = client.patch(f"/entries/{entry.id}", json={"title": "Only"})
+    client, repo, session, owned_journals = api
+
+    entry = seeded(repo, owned_journals)
+
+    response = client.patch(
+        f"/entries/{entry.id}",
+        json={"title": "Only"},
+    )
+
     assert response.status_code == 422
     assert repo.get(entry.id).title == "Morning"
     assert session.commits == 0
 
 
 def test_publish_entry_with_content(api):
-    client, repo, session = api
-    entry = seeded(repo)
-    response = client.patch(f"/entries/{entry.id}/publish")
+    client, repo, session, owned_journals = api
+
+    entry = seeded(repo, owned_journals)
+
+    response = client.patch(
+        f"/entries/{entry.id}/publish"
+    )
+
     assert response.status_code == 200
     assert response.json()["status"] == "published"
     assert repo.get(entry.id).status == EntryStatus.PUBLISHED
@@ -183,18 +408,31 @@ def test_publish_entry_with_content(api):
 
 
 def test_publish_missing_entry_returns_404(api):
-    client, _, session = api
-    response = client.patch(f"/entries/{uuid4()}/publish")
+    client, _, session, _ = api
+
+    response = client.patch(
+        f"/entries/{uuid4()}/publish"
+    )
+
     assert response.status_code == 404
     assert session.commits == 0
 
 
 def test_toggle_favorite_on_and_off(api):
-    client, repo, session = api
-    entry = seeded(repo)
-    first = client.patch(f"/entries/{entry.id}/favorite")
-    second = client.patch(f"/entries/{entry.id}/favorite")
-    assert first.status_code == second.status_code == 200
+    client, repo, session, owned_journals = api
+
+    entry = seeded(repo, owned_journals)
+
+    first = client.patch(
+        f"/entries/{entry.id}/favorite"
+    )
+
+    second = client.patch(
+        f"/entries/{entry.id}/favorite"
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
     assert first.json()["is_favorite"] is True
     assert second.json()["is_favorite"] is False
     assert repo.get(entry.id).is_favorite is False
@@ -202,16 +440,25 @@ def test_toggle_favorite_on_and_off(api):
 
 
 def test_favorite_missing_entry_returns_404(api):
-    client, _, session = api
-    response = client.patch(f"/entries/{uuid4()}/favorite")
+    client, _, session, _ = api
+
+    response = client.patch(
+        f"/entries/{uuid4()}/favorite"
+    )
+
     assert response.status_code == 404
     assert session.commits == 0
 
 
 def test_delete_existing_entry_returns_204(api):
-    client, repo, session = api
-    entry = seeded(repo)
-    response = client.delete(f"/entries/{entry.id}")
+    client, repo, session, owned_journals = api
+
+    entry = seeded(repo, owned_journals)
+
+    response = client.delete(
+        f"/entries/{entry.id}"
+    )
+
     assert response.status_code == 204
     assert response.content == b""
     assert repo.get(entry.id) is None
@@ -219,12 +466,11 @@ def test_delete_existing_entry_returns_204(api):
 
 
 def test_delete_missing_entry_returns_404(api):
-    client, _, session = api
-    response = client.delete(f"/entries/{uuid4()}")
+    client, _, session, _ = api
+
+    response = client.delete(
+        f"/entries/{uuid4()}"
+    )
+
     assert response.status_code == 404
     assert session.commits == 0
-
-
-def test_malformed_entry_id_returns_422(api):
-    client, _, _ = api
-    assert client.get("/entries/not-a-uuid").status_code == 422
