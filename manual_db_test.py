@@ -8,6 +8,7 @@ from app.core.database import Base
 from app.entries.domain import JournalEntry
 from app.entries.sql_repository import SqlEntryRepository
 from app.journals.models import JournalModel
+from app.users.models import UserModel  # noqa: F401
 
 engine = create_engine(
     "sqlite://",

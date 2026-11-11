@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -14,7 +15,7 @@ from app.core.database import Base
 config = context.config
 
 # Added for migration to Postgres
-database_url = context.get_x_argument(as_dictionary=True).get("database_url")
+database_url = context.get_x_argument(as_dictionary=True).get("database_url") or os.getenv("DATABASE_URL")
 
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url)

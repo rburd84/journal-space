@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    String
+    String, ForeignKey
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,6 +16,7 @@ class JournalModel(Base):
     )
 
     user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"),
         index=True
     )
 
