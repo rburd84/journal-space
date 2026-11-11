@@ -42,7 +42,6 @@ def verify_clerk_token(token: str) -> dict:
         return claims
 
     except jwt.PyJWKClientConnectionError as error:
-        logger.exception("Clerk JWKS client failed")
         raise HTTPException(
             status_code=503,
             detail="Authentication service temporarily unavailable",
@@ -55,7 +54,6 @@ def verify_clerk_token(token: str) -> dict:
         ) from error
 
     except (ConnectionError, TimeoutError, OSError) as error:
-        logger.exception("Clerk authentication network or OS error")
         raise HTTPException(
             status_code=503,
             detail="Authentication service temporarily unavailable",
