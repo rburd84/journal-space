@@ -2,7 +2,7 @@ import {Star, Trash2} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Link, useNavigate, useParams} from "react-router";
 import {useEffect, useState} from "react";
-import {getJournal} from "@/lib/api.js";
+import {apiFetch, getJournal} from "@/lib/api.js";
 
 
 export default function Reader() {
@@ -26,7 +26,7 @@ export default function Reader() {
             setEntry(null);
 
             try {
-                const response = await fetch(`/api/entries/${entryId}`, {
+                const response = await apiFetch(`/entries/${entryId}`, {
                     signal: controller.signal,
                 });
 
@@ -89,8 +89,7 @@ export default function Reader() {
         setFavoriteError(null);
 
         try {
-            const response = await fetch(
-                `/api/entries/${entry.id}/favorite`,
+            const response = await apiFetch(`/entries/${entry.id}/favorite`,
                 {method: "PATCH"}
             );
 
@@ -123,8 +122,7 @@ export default function Reader() {
         setDeleteError(null);
 
         try {
-            const response = await fetch(
-                `/api/entries/${entry.id}`,
+            const response = await apiFetch(`/entries/${entry.id}`,
                 {method: "DELETE"}
             );
 

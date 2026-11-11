@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.users.invitations import InvitationModel
+from app.users.models import UserModel  # noqa: F401
 
 
 def normalize_email(email: str) -> str:

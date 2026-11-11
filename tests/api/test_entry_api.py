@@ -474,3 +474,80 @@ def test_delete_missing_entry_returns_404(api):
 
     assert response.status_code == 404
     assert session.commits == 0
+
+
+# Phase 46M.4: router-level cross-account isolation.
+# The existing fixture's ownership guards are deliberately bound to Account A.
+# Switching the dependency to Account B exercises the route's guard calls,
+# not the production SQL ownership implementation.
+@pytest.mark.parametrize(
+    ("method", "suffix", "payload"),
+    [
+        ("get", "", None),
+        ("patch", "", {"title": "Intruder", "content": "Changed"}),
+        ("patch", "/publish", None),
+        ("patch", "/favorite", None),
+        ("delete", "", None),
+    ],
+)
+def test_other_account_cannot_read_modify_or_delete_entry(api, method, suffix, payload):
+    client, repo, session, owned_journals = api
+    entry = seeded(repo, owned_journals, title="Private", content="Original")
+    original_status = entry.status
+    original_favorite = entry.is_favorite
+
+    account_b = SimpleNamespace(id=uuid4(), is_active=True)
+    client.app.dependency_overrides[get_current_user] = lambda: account_b
+
+    url = f"/entries/{entry.id}{suffix}"
+    request = getattr(client, method)
+    response = request(url, json=payload) if payload is not None else request(url)
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Entry not found"
+    saved = repo.get(entry.id)
+    assert saved is not None
+    assert saved.title == "Private"
+    assert saved.content == "Original"
+    assert saved.status == original_status
+    assert saved.is_favorite == original_favorite
+    assert session.commits == 0
+
+
+def test_other_account_cannot_list_entries_in_private_journal(api):
+    client, repo, session, owned_journals = api
+    entry = seeded(repo, owned_journals)
+    client.app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=uuid4(), is_active=True
+    )
+
+    response = client.get("/entries/", params={"journal_id": str(entry.journal_id)})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Journal not found"
+    assert repo.get(entry.id) is not None
+    assert session.commits == 0
+
+
+def test_other_account_cannot_create_entry_in_private_journal(api):
+    client, repo, session, owned_journals = api
+    existing = seeded(repo, owned_journals, title="Original")
+    count_before = len(repo.entries)
+    client.app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=uuid4(), is_active=True
+    )
+
+    response = client.post(
+        "/entries/",
+        json={
+            "journal_id": str(existing.journal_id),
+            "title": "Unauthorized entry",
+            "content": "Must not be saved",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Journal not found"
+    assert len(repo.entries) == count_before
+    assert repo.get(existing.id).title == "Original"
+    assert session.commits == 0

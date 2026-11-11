@@ -5,7 +5,6 @@ import {useEffect, useState} from "react";
 import EntryCard from "@/components/EntryCard";
 import {Button} from "@/components/ui/button";
 import {getEntries, getJournal, getJournals} from "@/lib/api.js";
-import {DEV_USER_ID} from "@/lib/devUser.js";
 
 
 export default function Entries() {
@@ -41,7 +40,7 @@ export default function Entries() {
                         setEntries(entriesData);
                     }
                 } else {
-                    const journals = await getJournals(DEV_USER_ID);
+                    const journals = await getJournals();
 
                     const activeJournals = journals.filter(
                         (journal) => !journal.is_archived
@@ -110,17 +109,17 @@ export default function Entries() {
                     </p>
                 </div>
 
-                <Button
-                    nativeButton={false}
-                    render={<Link to={
-                                      journalId
-                                          ? `/journals/${journalId}/entries/new`
-                                          : "/entries/new"
-                                  }/>}
-                    className="h-auto min-h-11 px-5 py-3">
+                <Link
+                    to={
+                        journalId
+                            ? `/journals/${journalId}/entries/new`
+                            : "/entries/new"
+                    }
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+                >
                     <Plus size={18} aria-hidden="true"/>
                     New Entry
-                </Button>
+                </Link>
             </header>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">

@@ -2,8 +2,7 @@ import {useEffect, useState} from "react";
 import {Star} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Link, useParams} from "react-router";
-import {DEV_USER_ID} from "@/lib/devUser.js";
-import {getJournal, getJournals} from "@/lib/api.js";
+import {apiFetch, getJournal, getJournals} from "@/lib/api.js";
 
 export default function Editor() {
     const {journalId, entryId} = useParams();
@@ -42,7 +41,7 @@ export default function Editor() {
             setSaveSuccess(false);
 
             try {
-                const response = await fetch(`/api/entries/${entryId}`, {
+                const response = await apiFetch(`/entries/${entryId}`, {
                     signal: controller.signal,
                 });
 
@@ -85,7 +84,7 @@ export default function Editor() {
             setJournalsError("");
 
             try {
-                const data = await getJournals(DEV_USER_ID);
+                const data = await getJournals();
 
                 if (!cancelled) {
                     setAvailableJournals(
@@ -157,7 +156,7 @@ export default function Editor() {
                 ? `/api/entries/${savedEntry.id}`
                 : "/api/entries/";
 
-            const response = await fetch(url, {
+            const response = await apiFetch(url.replace(/^\/api/, ""), {
                 method: isExistingEntry ? "PATCH" : "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -210,8 +209,7 @@ export default function Editor() {
         setPublishError(null);
 
         try {
-            const response = await fetch(
-                `/api/entries/${savedEntry.id}/publish`,
+            const response = await apiFetch(`/entries/${savedEntry.id}/publish`,
                 {method: "PATCH",}
             );
 
@@ -235,8 +233,7 @@ export default function Editor() {
         setFavoriteError(null);
 
         try {
-            const response = await fetch(
-                `/api/entries/${savedEntry.id}/favorite`,
+            const response = await apiFetch(`/entries/${savedEntry.id}/favorite`,
                 {method: "PATCH"}
             );
 

@@ -1,9 +1,12 @@
+import logging
 import os
 
 import httpx
 from fastapi import HTTPException
 
 from app.users.admin import normalize_email
+
+logger = logging.getLogger(__name__)
 
 
 def get_verified_clerk_email(clerk_user_id: str) -> str:
@@ -24,6 +27,10 @@ def get_verified_clerk_email(clerk_user_id: str) -> str:
         response.raise_for_status()
         user = response.json()
     except (httpx.HTTPError, ValueError) as error:
+        logger.exception(
+            "Clerk user lookup failed: %s",
+            type(error).__name__,
+        )
         raise HTTPException(
             status_code=503,
             detail="Authentication service temporarily unavailable",

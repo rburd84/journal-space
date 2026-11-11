@@ -83,7 +83,6 @@ def test_create_journal_returns_201_and_default_type(api):
     response = client.post(
         "/journals/",
         json={
-            "user_id": str(user.id),
             "title": "  Notes  ",
         },
     )
@@ -106,7 +105,6 @@ def test_create_journal_accepts_explicit_type(api):
     response = client.post(
         "/journals/",
         json={
-            "user_id": str(user.id),
             "title": "Thanks",
             "type": "gratitude",
         },
@@ -123,7 +121,6 @@ def test_create_journal_rejects_blank_title(api, title):
     response = client.post(
         "/journals/",
         json={
-            "user_id": str(user.id),
             "title": title,
         },
     )
@@ -139,7 +136,6 @@ def test_create_journal_rejects_invalid_type(api):
     response = client.post(
         "/journals/",
         json={
-            "user_id": str(user.id),
             "title": "Notes",
             "type": "unknown",
         },
@@ -149,7 +145,7 @@ def test_create_journal_rejects_invalid_type(api):
     assert session.commits == 0
 
 
-def test_create_journal_rejects_missing_user_id(api):
+def test_create_journal_does_not_require_user_id(api):
     client, _, _, _ = api
 
     response = client.post(
@@ -157,7 +153,7 @@ def test_create_journal_rejects_missing_user_id(api):
         json={"title": "Notes"},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 201
 
 
 def test_create_journal_rejects_another_user_id(api):
@@ -171,7 +167,7 @@ def test_create_journal_rejects_another_user_id(api):
         },
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 422
     assert repo.journals == {}
     assert session.commits == 0
 
@@ -394,3 +390,78 @@ def test_restore_missing_journal_returns_404(api):
 
     assert response.status_code == 404
     assert session.commits == 0
+
+
+# Phase 46M.3: Account B must not access or modify Account A's journals.
+# These are router-level tests: the ownership guard is mocked by the api fixture.
+@pytest.mark.parametrize(
+    ("method", "suffix", "payload"),
+    [
+        ("get", "", None),
+        ("patch", "/rename", {"title": "Intruder rename"}),
+        ("patch", "/archive", None),
+        ("patch", "/restore", None),
+    ],
+)
+def test_other_account_cannot_access_or_change_journal(api, method, suffix, payload):
+    client, repo, session, account_a = api
+    account_b = SimpleNamespace(id=uuid4(), is_active=True)
+    journal_a = Journal(user_id=account_a.id, title="Account A private journal")
+    repo.save(journal_a)
+
+    # Change the authenticated identity without changing the underlying data.
+    client.app.dependency_overrides[get_current_user] = lambda: account_b
+
+    request = getattr(client, method)
+    url = f"/journals/{journal_a.id}{suffix}"
+    response = request(url, json=payload) if payload is not None else request(url)
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Journal not found"
+    assert repo.get(journal_a.id).title == "Account A private journal"
+    assert repo.get(journal_a.id).is_archived is False
+    assert repo.get(journal_a.id).user_id == account_a.id
+    assert session.commits == 0
+
+
+@pytest.mark.parametrize("archived", [False, True])
+def test_other_account_cannot_change_journal_archive_state(api, archived):
+    client, repo, session, account_a = api
+    account_b = SimpleNamespace(id=uuid4(), is_active=True)
+    journal_a = Journal(
+        user_id=account_a.id,
+        title="Account A private journal",
+        is_archived=archived,
+    )
+    repo.save(journal_a)
+    client.app.dependency_overrides[get_current_user] = lambda: account_b
+
+    operation = "restore" if archived else "archive"
+    response = client.patch(f"/journals/{journal_a.id}/{operation}")
+
+    assert response.status_code == 404
+    assert repo.get(journal_a.id).is_archived is archived
+    assert session.commits == 0
+
+
+def test_switching_accounts_keeps_journal_lists_separate(api):
+    client, repo, _, account_a = api
+    account_b = SimpleNamespace(id=uuid4(), is_active=True)
+    journal_a = Journal(user_id=account_a.id, title="Account A private journal")
+    journal_b = Journal(user_id=account_b.id, title="Account B private journal")
+    repo.save(journal_a)
+    repo.save(journal_b)
+
+    response_a = client.get("/journals/")
+    assert response_a.status_code == 200
+    assert {item["id"] for item in response_a.json()} == {str(journal_a.id)}
+
+    client.app.dependency_overrides[get_current_user] = lambda: account_b
+    response_b = client.get("/journals/")
+    assert response_b.status_code == 200
+    assert {item["id"] for item in response_b.json()} == {str(journal_b.id)}
+
+    # Account B still has access to its own journal by ID.
+    own_response = client.get(f"/journals/{journal_b.id}")
+    assert own_response.status_code == 200
+    assert own_response.json()["id"] == str(journal_b.id)

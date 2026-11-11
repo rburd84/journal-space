@@ -26,12 +26,6 @@ def create_journal(
         db: Session = Depends(get_db),
         current_user: UserModel = Depends(get_current_user),
 ):
-    if data.user_id != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Cannot create a journal for another user",
-        )
-
     service = JournalService(SqlJournalRepository(db))
 
     try:
