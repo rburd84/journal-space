@@ -1,0 +1,8 @@
+# EXAMPLE ONLY — do not rename to render.yaml or deploy until reviewed.
+# Service names, regions, plan costs and database lifecycle are intentionally unspecified.
+# Render Static Site: rootDir frontend; buildCommand npm ci && npm run build; publishPath dist.
+# Render Web Service: Python; buildCommand uv sync --frozen; startCommand uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Web service healthCheckPath: /health
+# Required backend environment variables: DATABASE_URL, CLERK_ISSUER, CLERK_AUTHORIZED_PARTIES, CORS_ALLOWED_ORIGINS
+# Required static-site build variables: VITE_CLERK_PUBLISHABLE_KEY, VITE_API_ORIGIN
+# PostgreSQL must be provisioned and migrated separately with backups configured.

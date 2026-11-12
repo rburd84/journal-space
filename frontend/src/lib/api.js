@@ -1,5 +1,13 @@
 let getAuthToken = null;
 
+
+const configuredApiOrigin = (import.meta.env.VITE_API_ORIGIN || "").trim().replace(/\/$/, "");
+if (configuredApiOrigin && !/^https:\/\/[^/]+$/i.test(configuredApiOrigin)) {
+    throw new Error("VITE_API_ORIGIN must be an HTTPS origin without a path.");
+}
+const apiBase = `${configuredApiOrigin}/api`;
+
+
 const AUTH_RETRY_DELAYS_MS = [250, 750, 1500];
 
 function delay(ms) {
