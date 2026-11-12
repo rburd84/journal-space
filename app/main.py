@@ -2,10 +2,13 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.production import validate_production_configuration
 
 from app.entries.router import router as entries_router
 from app.journals.router import router as journals_router
 from app.users.models import UserModel  # noqa: F401
+
+validate_production_configuration()
 
 app = FastAPI(title="Journal API")
 
