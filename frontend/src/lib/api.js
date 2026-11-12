@@ -1,18 +1,10 @@
 let getAuthToken = null;
 
-
 const configuredApiOrigin = (import.meta.env.VITE_API_ORIGIN || "").trim().replace(/\/$/, "");
-if (configuredApiOrigin && !/^https:\/\/[^/]+$/i.test(configuredApiOrigin)) {
+if (configuredApiOrigin && !/^https:\/\/[^/?#]+$/i.test(configuredApiOrigin)) {
     throw new Error("VITE_API_ORIGIN must be an HTTPS origin without a path.");
 }
 const apiBase = `${configuredApiOrigin}/api`;
-
-
-const AUTH_RETRY_DELAYS_MS = [250, 750, 1500];
-
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 // Installed only while a Clerk-authenticated app tree is mounted.
 export function setAuthTokenGetter(getter) {
@@ -24,50 +16,18 @@ export async function apiFetch(path, options = {}) {
         throw new Error("Sign in is required before accessing Stillspace.");
     }
 
-    const tokenGetter = getAuthToken;
-    const method = (options.method || "GET").toUpperCase();
-
-    // Only automatically retry read-only GET requests.
-    // Never replay writes, updates, or deletes.
-    const canRetry = method === "Get";
-
-    for (let attempt = 0; ; attempt += 1) {
-
-        const token = attempt === 0
-            ? await tokenGetter()
-            : await tokenGetter({skipCache: true});
-
-        if (!token) {
-            throw new Error(
-                "Your session is unavailable. Please sign in again."
-            );
-        }
-
-        const headers = new Headers(options.headers || {});
-        headers.set("Authorization", `Bearer ${token}`);
-
-        const response = await fetch(`/api${path}`, {
-            ...options,
-            headers,
-        });
-
-        if (
-            response.status !== 401 ||
-            !canRetry ||
-            attempt >= AUTH_RETRY_DELAYS_MS.length
-        ) {
-            return response;
-        }
-
-        await delay(AUTH_RETRY_DELAYS_MS[attempt]);
-
-        if (getAuthToken !== tokenGetter) {
-            throw new Error(
-                "Your authentication session has changed."
-            );
-        }
+    const token = await getAuthToken();
+    if (!token) {
+        throw new Error("Your session is unavailable. Please sign in again.");
     }
 
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", `Bearer ${token}`);
+
+    return fetch(`${apiBase}${path}`, {
+        ...options,
+        headers,
+    });
 }
 
 export async function request(path, options = {}) {
