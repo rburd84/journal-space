@@ -9,6 +9,7 @@ import app.journals.models  # noqa: F401
 import app.users.invitations  # noqa: F401
 import app.users.models  # noqa: F401
 from app.core.database import Base
+from app.core.database_url import normalize_database_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,7 +19,7 @@ config = context.config
 database_url = context.get_x_argument(as_dictionary=True).get("database_url") or os.getenv("DATABASE_URL")
 
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    config.set_main_option("sqlalchemy.url", normalize_database_url(database_url).replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
