@@ -263,3 +263,10 @@ http-client.private.env.json
 *.dump
 *.backup
 *.pgdump
+
+# Generated dependencies and local project data
+node_modules/
+frontend/node_modules/
+*.db
+*.sqlite
+*.sqlite3
