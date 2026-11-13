@@ -2,8 +2,7 @@
 
 **A calm, personal journaling web application.**
 
-> **Project status:** Local development / private-beta preparation. **Not ready for public deployment or real-user
-private data.** This README documents the source snapshot reviewed in November 2026, not features planned for a future
+> **Project status:** Invitation-only private-beta preparation. **Not deployed or approved for real-user private data.** This README documents the source snapshot reviewed in November 2026, not features planned for a future
 > release.
 
 ## What Stillspace does
@@ -27,9 +26,9 @@ application provides:
 |-----------------------|-----------------------------------------------------------------------------|
 | Frontend              | React 19, Vite 8, React Router, Tailwind CSS 4, Base UI / shadcn components |
 | Backend               | Python 3.14+, FastAPI, Pydantic, SQLAlchemy                                 |
-| Development database  | SQLite (`journal.db`)                                                       |
+| Development database  | SQLite or PostgreSQL (`stillspace_test` for isolated tests)                    |
 | Dependency management | `uv` for Python; npm for frontend                                           |
-| Tests                 | pytest (backend)                                                            |
+| Tests                 | pytest (backend), Vitest (frontend)                                           |
 
 ## Project layout
 
@@ -77,8 +76,7 @@ The API runs at `http://127.0.0.1:8000` by default. Useful development endpoints
 - `http://127.0.0.1:8000/health` — health response
 - `http://127.0.0.1:8000/docs` — interactive FastAPI API documentation
 
-The backend currently uses `sqlite:///./journal.db` and creates tables on startup. This is **development-only**
-behavior, not a production migration strategy.
+Local development defaults to SQLite unless `DATABASE_URL` is set. Production requires PostgreSQL and Alembic migrations (`uv run alembic upgrade head`); never rely on automatic table creation for deployment.
 
 ### 2. Start the frontend
 
@@ -117,7 +115,7 @@ documentation pass.**
 2. The frontend makes HTTP requests to FastAPI; during local development, Vite forwards `/api/...` requests to the
    backend.
 3. FastAPI routes delegate journal and entry operations to service and repository layers.
-4. SQLAlchemy persists journals and entries to the local SQLite database.
+4. SQLAlchemy persists journals and entries to the configured SQLite or PostgreSQL database.
 5. Entries belong to journals through `journal_id`; journals carry a `user_id` field.
 
 ### Current browser routes
@@ -133,35 +131,30 @@ documentation pass.**
 | `/entries/:entryId`                | Read entry             |
 | `/entries/:entryId/edit`           | Edit entry             |
 
-## Security and privacy limitations
+## Authentication, privacy, and beta limitations
 
-**Do not expose this development build to untrusted users or store real testers' sensitive journals in it.**
+- Clerk JWT authentication and per-account journal/entry authorization are implemented.
+- Invitation records gate first-login account creation; disabled users are rejected.
+- Signed-JWT PostgreSQL HTTP tests cover invitation redemption, token rejection, and cross-account isolation.
+- Entry deletion is **permanent**; a 30-day Recently Deleted feature is **not implemented**.
+- Local PostgreSQL 18 backup/restore was tested with sample journal content and ownership, then the disposable data and restore databases were cleaned up. This does **not** verify hosted backups.
+- No production deployment or hosted acceptance test has been completed. Do not invite real users or store sensitive journals until these checks pass.
 
-- The frontend currently uses a **shared hardcoded development user ID**.
-- The API has **no enforced authentication or per-user ownership checks** for journal and entry operations.
-- Some requests accept a browser-supplied `user_id` or resource ID; these are **not proof of ownership**.
-- SQLite is configured for local development; production migrations, backups, and restore procedures have not been
-  verified.
-- Deleted entries are removed permanently, without a recovery window.
+## Render Hobby deployment plan (not deployed)
 
-These are release blockers, not features to work around by obscuring the website URL.
+The repository includes a proposed `render.yaml` Blueprint for a static Vite frontend, paid FastAPI web service, and paid PostgreSQL 18. The workspace subscription is intended to be **Render Hobby**; the Blueprint specifies paid resource sizes separately. Hosting incurs charges if provisioned.
 
-## Planned invitation-only private beta (not yet implemented)
+Before provisioning: review Render pricing and service plans; confirm Python 3.14 compatibility; configure the production Clerk instance; enter HTTPS frontend/backend origins and credentials; verify backup retention and recovery; and disable Blueprint Auto Sync. Services have automatic deployment disabled in the Blueprint. Creating a Blueprint or changing Render settings requires explicit approval.
 
-The agreed initial beta scope is **five invited testers plus one administrator**, running for **30 days** after launch
-approval. Planned requirements include:
+Backend environment: `STILLSPACE_ENV=production`, `DATABASE_URL` (from Render PostgreSQL), `CLERK_ISSUER`, `CLERK_AUTHORIZED_PARTIES`, and `CORS_ALLOWED_ORIGINS`. The latter two must match the frontend's HTTPS origin. The application normalizes PostgreSQL connection URLs to the installed psycopg 3 driver, including during Alembic migrations.
 
-- Invitation-only passwordless email-code authentication, with individual account sessions.
-- Server-side authorization for **every** journal and entry operation.
-- PostgreSQL hosting, versioned migrations, tested backups and restore procedures.
-- A **30-day Recently Deleted** recovery period for entries and a separate account-departure retention procedure.
-- A first-login welcome/privacy acknowledgment and improved empty-state guidance.
-- Desktop and mobile browser acceptance testing.
-- A dedicated email address for tester feedback.
+Frontend build environment: `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_API_ORIGIN` (HTTPS backend origin, without `/api`). Vite embeds these at build time. Do not commit secrets.
 
-Preferred providers under evaluation: **Clerk** for authentication, **Render** for hosting, and the existing GoDaddy
-domain / Microsoft 365 mailbox. Provider capabilities and final costs still need verification. None of these
-integrations should be assumed active.
+Release checks: `uv run pytest`, `uv run alembic heads`, `npm ci`, `npm run lint`, `npm test`, and `npm run build`. The opt-in PostgreSQL HTTP tests require a local disposable `TEST_DATABASE_URL` pointing to `stillspace_test`; they must never target production. Hosted acceptance must additionally verify authentication, invitation gating, authorization, migrations, persistence, frontend routes, and backups.
+
+## Planned beta scope
+
+The intended first beta is five invited testers and one administrator for 30 days after launch approval. Desktop/mobile browser acceptance, welcome/privacy copy, feedback workflow, and user manual remain to be finalized.
 
 ## Documentation roadmap
 
