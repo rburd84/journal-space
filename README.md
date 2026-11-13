@@ -156,6 +156,13 @@ Release checks: `uv run pytest`, `uv run alembic heads`, `npm ci`, `npm run lint
 
 The intended first beta is five invited testers and one administrator for 30 days after launch approval. Desktop/mobile browser acceptance, welcome/privacy copy, feedback workflow, and user manual remain to be finalized.
 
+## Beta guides
+
+- [Tester User Guide](docs/TESTER_GUIDE.md) — sign-in, journals, writing, favorites, and permanent deletion.
+- [Administrator Guide](docs/ADMIN_GUIDE.md) — invitations, deployment approval, security, backups, and incident handling.
+
+Both are pre-launch drafts pending hosted acceptance and final contact details.
+
 ## Documentation roadmap
 
 - **Private Beta Readiness & Release Plan:** Decisions, risks, stages, budget, and launch gates (drafted separately).
