@@ -4,7 +4,9 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./journal.db")
+from app.core.database_url import normalize_database_url
+
+DATABASE_URL = normalize_database_url(os.getenv("DATABASE_URL", "sqlite:///./journal.db"))
 
 connect_args = {"check_same_thread": False} if make_url(DATABASE_URL).get_backend_name() == "sqlite" else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
