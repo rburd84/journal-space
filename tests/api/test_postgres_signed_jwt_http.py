@@ -77,6 +77,7 @@ def postgres_engine():
 def pg_client(postgres_engine):
     engine = postgres_engine
     with Session(engine) as session:
+        session.execute(text("TRUNCATE TABLE journal_entries, journals, invitations, users RESTART IDENTITY CASCADE"))
         a = UserModel(clerk_user_id="pg_account_a")
         b = UserModel(clerk_user_id="pg_account_b")
         disabled = UserModel(clerk_user_id="pg_disabled", is_active=False)
@@ -123,7 +124,7 @@ def pg_client(postgres_engine):
         app.dependency_overrides.clear()
 
 
-def test_postgres_signed_auth_and_invitation(pg_client):
+def test_postgres_signed_auth_and_invitation(pg_client, postgres_engine):
     client, auth, _, wrong_key = pg_client
     assert client.get("/api/journals/").status_code == 401
     for headers in (
@@ -135,6 +136,10 @@ def test_postgres_signed_auth_and_invitation(pg_client):
     assert client.get("/api/journals/", headers=auth("pg_disabled")).status_code == 403
     # An invited first-login user is created and the invitation redeemed atomically.
     assert client.get("/api/journals/", headers=auth("pg_new_invited")).status_code == 200
+    with Session(postgres_engine) as session:
+        invitation = session.scalar(select(InvitationModel).where(InvitationModel.email == "invited@example.test"))
+        assert invitation.redeemed_at is not None
+        assert invitation.redeemed_by_user_id is not None
 
 
 def test_postgres_cross_account_isolation_and_persistence(pg_client, postgres_engine):
@@ -167,6 +172,3 @@ def test_postgres_cross_account_isolation_and_persistence(pg_client, postgres_en
         assert session.get(JournalModel, ids["journal_b"]).title == "B private journal"
         assert session.get(EntryModel, ids["entry_a"]).content == "A private content"
         assert session.get(EntryModel, ids["entry_b"]).content == "B private content"
-        invitation = session.scalar(select(InvitationModel).where(InvitationModel.email == "invited@example.test"))
-        assert invitation.redeemed_at is not None
-        assert invitation.redeemed_by_user_id is not None
