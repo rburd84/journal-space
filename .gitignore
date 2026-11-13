@@ -259,3 +259,7 @@ http-client.private.env.json
 *.db-journal
 *.db-shm
 *.db-wal
+# Local PostgreSQL backup archives (never commit journal data)
+*.dump
+*.backup
+*.pgdump
