@@ -13,6 +13,8 @@ services:
     envVars:
       - key: STILLSPACE_ENV
         value: production
+      - key: PYTHON_VERSION
+        value: "3.14"
       - key: DATABASE_URL
         fromDatabase:
           name: stillspace-db
@@ -47,3 +49,4 @@ databases:
     postgresMajorVersion: "18"
     databaseName: stillspace
     user: stillspace_app
+    ipAllowList: []
